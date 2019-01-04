@@ -1,0 +1,4 @@
+Classifier&TPR&FPR&AUC&CV10 Acc. \\ \hline
+{% for clf_label in CLF_LABELS %}
+    {{ clf_label }}&{{ '%0.2f' % CLASSIFIERS[clf_label].TEST_TPR_RATE }}&{{ '%0.2f' % CLASSIFIERS[clf_label].TEST_FPR_RATE }}&{{ '%0.2f' % CLASSIFIERS[clf_label].ROC_AUC }}&{{ '%0.2f+-%0.2f' % (CLASSIFIERS[clf_label].CV10_BALANCED_ACCURACY[0], CLASSIFIERS[clf_label].CV10_BALANCED_ACCURACY[1]) }} \\
+{% endfor %}

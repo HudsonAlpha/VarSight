@@ -34,7 +34,7 @@ from sklearn.model_selection import StratifiedKFold
 from sklearn.model_selection import train_test_split
 from sklearn.neural_network import MLPClassifier
 
-PYXIS_DATE='12192018'   
+PYXIS_DATE='01042019'   
 
 def getPyxisMapResults():
     '''
@@ -112,11 +112,12 @@ def loadFormattedData():
     '''
     Core test function.  This function is primarily about loading and formatting data prior to training/testing any 
     classifiers.
-    @return - tuple (xFinal, yFinal, featureLabels, startIndices)
+    @return - tuple (xFinal, yFinal, featureLabels, startIndices, allRepDicts)
         xFinal - an NxM matrix where N is the number of variants in our test/training set and M is the number of features; contains feature values
         yFinal - an N length array where N is the number of variants in our test/training set; 1 if the variant was reported
         featureLabels - an M length array containing feature labels for our output benefit
         startIndices - a (C+1) length array containing the start indices of variants from an individual case
+        allRepDicts - an N length array of None or dictionaries; if a dictionary, it contains data on a returned variant
     '''
     pyxisRootDir = '/Users/matt/githubProjects/VarSight/pyxis_ranks_'+PYXIS_DATE
     
@@ -241,6 +242,7 @@ def loadFormattedData():
     allCatValues = []
     allCatBreak = {}
     allClassifications = []
+    allRepDicts = []
     
     #this will track the breaks between cases
     startIndices = [0]
@@ -251,6 +253,8 @@ def loadFormattedData():
             print('Skipping '+sl+', no primaries')
             continue
         primarySet = set([p['variant'] for p in caseData[sl]['primaries']])
+        primaryDict = {p['variant'] : p for p in caseData[sl]['primaries']}
+        assert(len(primaryDict) == len(caseData[sl]['primaries']))
         
         #if there is no CODICEM dump, we obviously can't do anything either
         codiDump = CodiDumpUtil.loadCodiDump(sl, fieldsOnly, geneFieldsOnly, seqFieldsOnly, transLabelsOnly)
@@ -290,6 +294,7 @@ def loadFormattedData():
         catValues = []
         catBreak = {}
         classifications = []
+        repDicts = []
         
         print('Primary set: ', primarySet)
         foundPrimaries = set([])
@@ -304,6 +309,9 @@ def loadFormattedData():
             isPrimary = (1.0 if (vName in primarySet) else 0.0)
             if isPrimary:
                 foundPrimaries.add(vName)
+                repDicts.append(primaryDict[vName])
+            else:
+                repDicts.append(None)
             
             #first, add in the best PyxisMap rank
             geneList = variant['genes']
@@ -317,10 +325,8 @@ def loadFormattedData():
             #now add all float values from CODICEM
             for fvl, invalidValue in floatValues:
                 if variant[fvl] == 'NA':
-                    #vData.append(0.0)
                     vData.append(invalidValue)
                 else:
-                    #vData.append(1.0)
                     vData.append(float(variant[fvl]))
 
             #add things from the gene values
@@ -413,6 +419,7 @@ def loadFormattedData():
                     allCatBreak[k] = []
                 allCatBreak[k] += catBreak[k]
             allClassifications.append(classifications)
+            allRepDicts += repDicts
         else:
             print('Ignoring all variants from '+sl+', no primaries found in CODICEM dump')
         
@@ -487,15 +494,19 @@ def loadFormattedData():
     #return the values
     yFinal = np.array(np.hstack(allClassifications), dtype='int64')
 
-    return (xFinal, yFinal, featureLabels, startIndices)
+    return (xFinal, yFinal, featureLabels, startIndices, allRepDicts)
 
-def runClassifiers(values, classifications, featureLabels, startIndices):
+def runClassifiers(values, classifications, featureLabels, startIndices, allRepDicts):
     '''
     @param values - a matrix with R rows and C columns, where there are "C" features
     @param classifications - an array of length R corresponding to the above values
     @param featureLabels - C length array containing labels (strings) for the features
     @param startIndices - the startIndices of individual cases in the training set
+    @param allRepDicts - a list of dictionaries for variants that were reported; non-reported vars are None
+    @return resultsDict - a dictionary containing many results we wish to include in a paper
     '''
+    
+    resultsDict = {}
     print('Values:', values.shape)
     
     #V1
@@ -506,7 +517,7 @@ def runClassifiers(values, classifications, featureLabels, startIndices):
 
     #split the data
     CASE_BASED_SPLIT = True
-    TEST_SIZE = 0.25
+    TEST_SIZE = 0.5
 
     if CASE_BASED_SPLIT:
         #we decided to split the train/test by case, going to need some custom stuff here
@@ -515,10 +526,12 @@ def runClassifiers(values, classifications, featureLabels, startIndices):
         trainXArray = []
         trainYArray = []
         train_indices = [0]
+        train_dicts = []
         tpTrain = 0
         testXArray = []
         testYArray = []
         test_indices = [0]
+        test_dicts = []
         tpTest = 0
         
         #ratio of TRAIN:TEST
@@ -533,12 +546,14 @@ def runClassifiers(values, classifications, featureLabels, startIndices):
                 trainXArray.append(values[st:et])
                 trainYArray.append(classifications[st:et])
                 train_indices.append(train_indices[-1]+(et-st))
+                train_dicts += allRepDicts[st:et]
                 tpTrain += tpCount
             else:
                 #we need more in our test
                 testXArray.append(values[st:et])
                 testYArray.append(classifications[st:et])
                 test_indices.append(test_indices[-1]+(et-st))
+                test_dicts += allRepDicts[st:et]
                 tpTest += tpCount
         
         #join them all together
@@ -558,6 +573,14 @@ def runClassifiers(values, classifications, featureLabels, startIndices):
         #split sizes (27259, 50) (9087, 50) (27259,) (9087,)
 
     print('split sizes', train_x.shape, test_x.shape, train_y.shape, test_y.shape)
+    
+    #save a bunch of data based on what was trained/tested on
+    resultsDict['TRAIN_SHAPE'] = train_x.shape
+    resultsDict['TEST_SHAPE'] = test_x.shape
+    resultsDict['TRAIN_TP'] = np.sum(train_y)
+    resultsDict['TEST_TP'] = np.sum(test_y)
+    resultsDict['TRAIN_CASES'] = len(train_indices)-1
+    resultsDict['TEST_CASES'] = len(test_indices)-1
 
     #class_weight="balanced" is when there is a major imbalance between the number of true negatives and true positives
     EXACT_MODE=0
@@ -565,8 +588,11 @@ def runClassifiers(values, classifications, featureLabels, startIndices):
     RANDOM_MODE=2
     currentMode=EXACT_MODE
 
+    #record the training method used
+    resultsDict['TRAINING_MODE'] = ['EXACT_MODE', 'GRID_MODE', 'RANDOM_MODE'][currentMode]
+
     classifiers = [
-        ('rf_bal', RandomForestClassifier(random_state=0, class_weight='balanced', max_depth=4, n_estimators=300, min_samples_split=2, max_features='sqrt'), 
+        ('RandomForest(sklearn)', RandomForestClassifier(random_state=0, class_weight='balanced', max_depth=4, n_estimators=300, min_samples_split=2, max_features='sqrt'), 
         {
             'random_state' : [0],
             'class_weight' : ['balanced'],
@@ -577,7 +603,7 @@ def runClassifiers(values, classifications, featureLabels, startIndices):
         }),
         #('svc_bal', SVC(probability=True, class_weight="balanced")),#this one doesn't scale well past 10k samples
         #('mlp', MLPClassifier()),#this one doesn't work, presumably because there is no balanced option
-        ('LogReg_bal', LogisticRegression(random_state=0, class_weight='balanced', penalty='l2', C=0.01, solver='liblinear', max_iter=200), 
+        ('LogisticRegression(sklearn)', LogisticRegression(random_state=0, class_weight='balanced', penalty='l2', C=0.01, solver='liblinear', max_iter=200), 
         {
             'random_state' : [0],
             'class_weight' : ['balanced'],
@@ -586,7 +612,7 @@ def runClassifiers(values, classifications, featureLabels, startIndices):
             'solver' : ['newton-cg', 'liblinear'],
             'max_iter' : [200]
         }),
-        ('imb_rf', BalancedRandomForestClassifier(random_state=0, n_estimators=300, max_depth=4, min_samples_split=2, max_features='sqrt'), 
+        ('BalancedRandomForest(imblearn)', BalancedRandomForestClassifier(random_state=0, n_estimators=300, max_depth=4, min_samples_split=2, max_features='sqrt'), 
         {
             'random_state' : [0],
             'n_estimators' : [100, 200, 300],
@@ -595,23 +621,30 @@ def runClassifiers(values, classifications, featureLabels, startIndices):
             'max_features' : ["sqrt", "log2"]
         }),
         #('imb_rus', RUSBoostClassifier(random_state=0)), #this one never seems to have a good result on the test set, I think it's overfitting due to boosting
-        ('imb_ee', EasyEnsembleClassifier(random_state=0, n_estimators=50), 
+        ('EasyEnsembleClassifier(imblearn)', EasyEnsembleClassifier(random_state=0, n_estimators=50), 
         {
             'random_state' : [0],
             'n_estimators' : [10, 20, 30, 40, 50]
         })
     ]
     
+    #save the labels for use later
+    resultsDict['CLF_LABELS'] = [l for l, r, h in classifiers]
+
     #things to calculate
     aucs = []
     rocs = []
     prs = []
     pr_aucs = []
-    
+    resultsDict['CLASSIFIERS'] = {}
+
     for clf_label, raw_clf, hyperparam in classifiers:
         #test the classifier?
         print(clf_label)
         print('\ttraining...')
+
+        #prep this for storing any results later
+        resultsDict['CLASSIFIERS'][clf_label] = {}
 
         if currentMode == EXACT_MODE:
             clf = raw_clf
@@ -625,31 +658,47 @@ def runClassifiers(values, classifications, featureLabels, startIndices):
         
         #regardless of above approach, we now fit it
         clf.fit(train_x, train_y)
-        if currentMode in [GRID_MODE, RANDOM_MODE]:
+        if currentMode == EXACT_MODE:
+            resultsDict['CLASSIFIERS'][clf_label]['TRAINED_PARAMS'] = clf.get_params()
+        elif currentMode in [GRID_MODE, RANDOM_MODE]:
             print('\tBest params:', clf.best_params_)
+            resultsDict['CLASSIFIERS'][clf_label]['BEST_PARAMS'] = clf.best_params_
 
-        #I was using this wrong, compute_sample_weight is if we have more trustworthy samples in our data; we might use this eventually but not yet
-        #clf.fit(train_x, train_y, compute_sample_weight('balanced', train_y))
-        
         try:
-            #print('\tfeature_important', clf.feature_importances_)
             print('\tfeature_important:')#, clf.best_estimator_.feature_importances_)
             for j, l in enumerate(featureLabels):
-                #print('', '', l, np.sum(clf.feature_importances_[2*j:2*(j+1)]), clf.feature_importances_[2*j:2*(j+1)], sep='\t')
                 if currentMode == EXACT_MODE:
                     print('', '', l, clf.feature_importances_[j], sep='\t')
                 elif currentMode in [GRID_MODE, RANDOM_MODE]:
                     print('', '', l, clf.best_estimator_.feature_importances_[j], sep='\t')
+            
+            if currentMode == EXACT_MODE:
+                resultsDict['CLASSIFIERS'][clf_label]['FEATURE_IMPORTANCE'] = clf.feature_importances_
+            elif currentMode in [GRID_MODE, RANDOM_MODE]:
+                resultsDict['CLASSIFIERS'][clf_label]['FEATURE_IMPORTANCE'] = clf.base_estimator_.feature_importances_
+
         except:
             pass
         
         #balanced accuracy - an accuracy score that is an average across the classes
-        print('\tbalanced_train_acc', balanced_accuracy_score(train_y, clf.predict(train_x)))
-        print('\tbalanced_test_acc', balanced_accuracy_score(test_y, clf.predict(test_x)))
+        trainAcc = balanced_accuracy_score(train_y, clf.predict(train_x))
+        testAcc = balanced_accuracy_score(test_y, clf.predict(test_x))
+        print('\tbalanced_train_acc', trainAcc)
+        print('\tbalanced_test_acc', testAcc)
+        resultsDict['CLASSIFIERS'][clf_label]['TRAIN_ACCURACY'] = trainAcc
+        resultsDict['CLASSIFIERS'][clf_label]['TEST_ACCURACY'] = testAcc
         
         #confusion matrix - exactly what it sounds like, 2x2 grid in our case
-        print('\tconf_matrix_train', confusion_matrix(train_y, clf.predict(train_x)))
-        print('\tconf_matrix_test', confusion_matrix(test_y, clf.predict(test_x)))
+        trainConf = confusion_matrix(train_y, clf.predict(train_x))
+        testConf = confusion_matrix(test_y, clf.predict(test_x))
+        print('\tconf_matrix_train', trainConf)
+        print('\tconf_matrix_test', testConf)
+        resultsDict['CLASSIFIERS'][clf_label]['TRAIN_CONFUSION_MATRIX'] = trainConf
+        resultsDict['CLASSIFIERS'][clf_label]['TRAIN_FPR_RATE'] = trainConf[0, 0] / np.sum(trainConf[0, :])
+        resultsDict['CLASSIFIERS'][clf_label]['TRAIN_TPR_RATE'] = trainConf[1, 1] / np.sum(trainConf[1, :])
+        resultsDict['CLASSIFIERS'][clf_label]['TEST_CONFUSION_MATRIX'] = testConf
+        resultsDict['CLASSIFIERS'][clf_label]['TEST_FPR_RATE'] = testConf[0, 0] / np.sum(testConf[0, :])
+        resultsDict['CLASSIFIERS'][clf_label]['TEST_TPR_RATE'] = testConf[1, 1] / np.sum(testConf[1, :])
         
         #roc_curve stuff - could be misleading due to imbalance
         y_pred_rf = clf.predict_proba(test_x)[:, 1]
@@ -658,6 +707,9 @@ def runClassifiers(values, classifications, featureLabels, startIndices):
         aucs.append(roc_auc)
         rocs.append((false_positive_rate, true_positive_rate))
         print('\troc_auc', roc_auc)
+        #resultsDict['CLASSIFIERS'][clf_label]['FALSE_POSITIVE_RATE_CURVES'] = false_positive_rate
+        #resultsDict['CLASSIFIERS'][clf_label]['TRUE_POSITIVE_RATE_CURVES'] = true_positive_rate
+        resultsDict['CLASSIFIERS'][clf_label]['ROC_AUC'] = roc_auc
         
         #precision-recall curve stuff - should be less misleading
         precision, recall, pr_thresholds = precision_recall_curve(test_y, y_pred_rf)
@@ -665,10 +717,23 @@ def runClassifiers(values, classifications, featureLabels, startIndices):
         pr_aucs.append(pr_auc)
         prs.append((recall, precision))
         print('\tpr_auc', pr_auc)
+        #resultsDict['CLASSIFIERS'][clf_label]['PRECISION_CURVES'] = precision
+        #resultsDict['CLASSIFIERS'][clf_label]['RECALL_CURVES'] = recall
+        resultsDict['CLASSIFIERS'][clf_label]['PR_AUC'] = pr_auc
         
         if CASE_BASED_SPLIT:
             ranks = []
+            rp = []
+            pDict = {
+                'VARIANT_OF_UNCERTAIN_SIGNIFICANCE' : 3,
+                'LIKELY_PATHOGENIC' : 4,
+                'PATHOGENIC' : 5
+            }
+            pList = ['VARIANT_OF_UNCERTAIN_SIGNIFICANCE', 'LIKELY_PATHOGENIC', 'PATHOGENIC']
+            #pList = ['LIKELY_PATHOGENIC', 'PATHOGENIC']
 
+            rDict = {}
+            
             #now do the test sets as if they were individual cases
             for x in range(0, len(test_indices)-1):
                 st = test_indices[x]
@@ -676,6 +741,7 @@ def runClassifiers(values, classifications, featureLabels, startIndices):
 
                 case_x = test_x[st:et]
                 case_y = test_y[st:et]
+                case_d = test_dicts[st:et]
 
                 #get the probabilities and sort them with most likely reported first
                 probs = clf.predict_proba(case_x)[:, 1]
@@ -683,13 +749,30 @@ def runClassifiers(values, classifications, featureLabels, startIndices):
 
                 for i, v in enumerate(ordered):
                     if case_y[v] == 1:
+                        pathLevel = pDict[case_d[v]['path_level']]
                         ranks.append(i)
-            
-            print(len(ranks), ranks)
-            print('mean:', np.mean(ranks))
-            print('stdev:', np.std(ranks))
-            print('median:', np.median(ranks))
+                        rp.append(pathLevel)
 
+                        if (pathLevel not in rDict):
+                            rDict[pathLevel] = []
+                        rDict[pathLevel].append(i)
+            
+            print('\tNum ranked:', len(ranks))
+            print('\tRanks:', ranks)
+            print('\tPatho:', rp)
+            print('\tmean:', np.mean(ranks))
+            print('\tstdev:', np.std(ranks))
+            print('\tmedian:', np.median(ranks))
+            resultsDict['CLASSIFIERS'][clf_label]['TEST_RANKINGS'] = {}
+            resultsDict['CLASSIFIERS'][clf_label]['TEST_RANKINGS']['OVERALL'] = ranks
+
+            for v in pList:
+                print('\t'+v)
+                print('\t\tRanks:', rDict[pDict[v]])
+                print('\t\tmean:', np.mean(rDict[pDict[v]]))
+                print('\t\tstdev:', np.std(rDict[pDict[v]]))
+                print('\t\tmedian:', np.median(rDict[pDict[v]]))
+                resultsDict['CLASSIFIERS'][clf_label]['TEST_RANKINGS'][v] = rDict[pDict[v]]
 
         if currentMode == EXACT_MODE:
             #cross validation scores
@@ -699,19 +782,24 @@ def runClassifiers(values, classifications, featureLabels, startIndices):
             bal_cvs_scores = cross_val_score(clf, train_x, train_y, cv=cv, scoring='balanced_accuracy')
             print('\tbal_cvs_scores', bal_cvs_scores)
             print("\tbal_Accuracy: %0.4f (+/- %0.4f)" % (bal_cvs_scores.mean(), bal_cvs_scores.std() * 2))
+            resultsDict['CLASSIFIERS'][clf_label]['CV10_BALANCED_ACCURACY'] = (bal_cvs_scores.mean(), bal_cvs_scores.std() * 2)
             
             #f1_weighted - see https://scikit-learn.org/stable/modules/generated/sklearn.metrics.f1_score.html#sklearn.metrics.f1_score
             f1w_cvs_scores = cross_val_score(clf, train_x, train_y, cv=cv, scoring='f1_weighted')
             print('\tf1w_cvs_scores', f1w_cvs_scores)
             print("\tf1w_Accuracy: %0.4f (+/- %0.4f)" % (f1w_cvs_scores.mean(), f1w_cvs_scores.std() * 2))
+            resultsDict['CLASSIFIERS'][clf_label]['CV10_BALANCED_F1_WEIGHTED'] = (f1w_cvs_scores.mean(), f1w_cvs_scores.std() * 2)
+
         elif currentMode in [GRID_MODE, RANDOM_MODE]:
             #CV is already calculated here so we can just dump it out
             print('\tscoring systems:')
             means = clf.cv_results_['mean_test_score']
             stds = clf.cv_results_['std_test_score']
             for mean, std, params in zip(means, stds, clf.cv_results_['params']):
-                print("\t\t%0.3f (+/-%0.03f) for %r"
-                    % (mean, std * 2, params))
+                print("\t\t%0.3f (+/-%0.03f) for %r" % (mean, std * 2, params))
+            
+            #TODO: do we want anything from these results or do we care?
+            
         print()
     
     #ROC curve
@@ -749,12 +837,51 @@ def runClassifiers(values, classifications, featureLabels, startIndices):
     plt.savefig(plotFN)
     plt.close()
 
+    return resultsDict
+
+def jsonDumpFix(o):
+    '''
+    Patch for doing a JSON dump when numpy int64s are present
+    see https://stackoverflow.com/questions/11942364/typeerror-integer-is-not-json-serializable-when-serializing-json-in-python
+    '''
+    if isinstance(o, np.int64):
+        return int(o)
+    elif isinstance(o, np.ndarray):
+        return o.tolist()
+    raise TypeError(str(o)+' '+str(type(o)))
+
+def generateLaTeXResult(d):
+    from jinja2 import Environment, FileSystemLoader
+    rootPath = '/Users/matt/githubProjects/VarSight/paper/'
+    env = Environment(loader=FileSystemLoader(rootPath))
+    template = env.get_template('data_template.tex')
+    rendered = template.render(d)
+    fp = open(rootPath+'/data_rendered.tex', 'wt+')
+    fp.write(rendered)
+    fp.close()
+
 def runAnalysis():
     '''
     Core function for joining our pieces together
     '''
-    (xFinal, yFinal, featureLabels, startIndices) = loadFormattedData()
-    runClassifiers(xFinal, yFinal, featureLabels, startIndices)
+    resultJsonFN = '/Users/matt/githubProjects/VarSight/paper/results.json'
+    REGENERATE_DATA = False
+
+    if REGENERATE_DATA or not os.path.exists(resultJsonFN):
+        (xFinal, yFinal, featureLabels, startIndices, allRepDicts) = loadFormattedData()
+        resultsDict = runClassifiers(xFinal, yFinal, featureLabels, startIndices, allRepDicts)
+
+        fp = open(resultJsonFN, 'wt+')
+        json.dump(resultsDict, fp, default=jsonDumpFix)
+        fp.close()
+
+    fp = open(resultJsonFN, 'rt')
+    resultsDict = json.load(fp)
+    fp.close()
+
+    print(json.dumps(resultsDict, indent=4, sort_keys=True))
+
+    generateLaTeXResult(resultsDict)
 
 if __name__ == '__main__':
     #this will re-run the PyxisMap tests, should update dates though
@@ -762,4 +889,3 @@ if __name__ == '__main__':
     
     #core tests
     runAnalysis()
-    
