@@ -1,3 +1,14 @@
+.DS_Store
 scripts/__pycache__
 paper/*.sty
 paper/*.bst
+pyxis_ranks_*
+paper/OUP_First_SBk_Bot_8401-eps-converted-to.pdf
+paper/OUP_First_SBk_Bot_8401.eps
+paper/Sample.pdf
+paper/bioinfo.cls
+paper/crop.cfg
+paper/main.aux
+paper/main.log
+paper/main.synctex.gz
+

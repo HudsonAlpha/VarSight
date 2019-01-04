@@ -1,4 +1,15 @@
-Classifier&TPR&FPR&AUC&CV10 Acc. \\ \hline
+\multirow{2}{*}{Classifier}&\multicolumn{4}{c||}{Performance}&\multicolumn{4}{c}{Rank Median(Mean)} \\ \cline{2-9}
+&TPR&FPR&AUC&CV10 Acc.&Overall (n={{ TEST_COUNTS.OVERALL }})&
+VUS (n={{ TEST_COUNTS.VARIANT_OF_UNCERTAIN_SIGNIFICANCE }})&
+Likely Path. (n={{ TEST_COUNTS.LIKELY_PATHOGENIC }})&Pathogenic (n={{ TEST_COUNTS.PATHOGENIC }}) \\ \hline
 {% for clf_label in CLF_LABELS %}
-    {{ clf_label }}&{{ '%0.2f' % CLASSIFIERS[clf_label].TEST_TPR_RATE }}&{{ '%0.2f' % CLASSIFIERS[clf_label].TEST_FPR_RATE }}&{{ '%0.2f' % CLASSIFIERS[clf_label].ROC_AUC }}&{{ '%0.2f+-%0.2f' % (CLASSIFIERS[clf_label].CV10_BALANCED_ACCURACY[0], CLASSIFIERS[clf_label].CV10_BALANCED_ACCURACY[1]) }} \\
+    {{ clf_label }}&
+    {{ '%0.2f' % CLASSIFIERS[clf_label].TEST_TPR_RATE }}&
+    {{ '%0.2f' % CLASSIFIERS[clf_label].TEST_FPR_RATE }}&
+    {{ '%0.2f' % CLASSIFIERS[clf_label].ROC_AUC }}&
+    {{ '%0.2f+-%0.2f' % (CLASSIFIERS[clf_label].CV10_BALANCED_ACCURACY[0], CLASSIFIERS[clf_label].CV10_BALANCED_ACCURACY[1]) }}&
+    {{ '%0.1f (%0.2f)' % (np.median(CLASSIFIERS[clf_label].TEST_RANKINGS.OVERALL), np.mean(CLASSIFIERS[clf_label].TEST_RANKINGS.OVERALL)) }}&
+    {{ '%0.1f (%0.2f)' % (np.median(CLASSIFIERS[clf_label].TEST_RANKINGS.VARIANT_OF_UNCERTAIN_SIGNIFICANCE), np.mean(CLASSIFIERS[clf_label].TEST_RANKINGS.VARIANT_OF_UNCERTAIN_SIGNIFICANCE)) }}&
+    {{ '%0.1f (%0.2f)' % (np.median(CLASSIFIERS[clf_label].TEST_RANKINGS.LIKELY_PATHOGENIC), np.mean(CLASSIFIERS[clf_label].TEST_RANKINGS.LIKELY_PATHOGENIC)) }}&
+    {{ '%0.1f (%0.2f)' % (np.median(CLASSIFIERS[clf_label].TEST_RANKINGS.PATHOGENIC), np.mean(CLASSIFIERS[clf_label].TEST_RANKINGS.PATHOGENIC)) }} \\
 {% endfor %}

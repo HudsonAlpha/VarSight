@@ -507,6 +507,7 @@ def runClassifiers(values, classifications, featureLabels, startIndices, allRepD
     '''
     
     resultsDict = {}
+    resultsDict['FEATURE_LABELS'] = featureLabels
     print('Values:', values.shape)
     
     #V1
@@ -773,6 +774,12 @@ def runClassifiers(values, classifications, featureLabels, startIndices, allRepD
                 print('\t\tstdev:', np.std(rDict[pDict[v]]))
                 print('\t\tmedian:', np.median(rDict[pDict[v]]))
                 resultsDict['CLASSIFIERS'][clf_label]['TEST_RANKINGS'][v] = rDict[pDict[v]]
+            
+            #this will get written multiple times but that's okay
+            resultsDict['TEST_COUNTS'] = {}
+            resultsDict['TEST_COUNTS']['OVERALL'] = len(ranks)
+            for p in pList:
+                resultsDict['TEST_COUNTS'][p] = len(rDict[pDict[p]])
 
         if currentMode == EXACT_MODE:
             #cross validation scores
@@ -851,6 +858,10 @@ def jsonDumpFix(o):
     raise TypeError(str(o)+' '+str(type(o)))
 
 def generateLaTeXResult(d):
+    '''
+    This function takes a dictionary of values from our results and makes the calls to render those results through
+    Jinja2 into LaTeX files for the paper.
+    '''
     from jinja2 import Environment, FileSystemLoader
     rootPath = '/Users/matt/githubProjects/VarSight/paper/'
     env = Environment(loader=FileSystemLoader(rootPath))
@@ -880,7 +891,7 @@ def runAnalysis():
     fp.close()
 
     print(json.dumps(resultsDict, indent=4, sort_keys=True))
-
+    resultsDict['np'] = np
     generateLaTeXResult(resultsDict)
 
 if __name__ == '__main__':
