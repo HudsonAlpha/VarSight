@@ -38,7 +38,10 @@ PYXIS_DATE='12192018'
 
 def getPyxisMapResults():
     '''
-    Script for downloading the PyxisMap results, update the date constant when needed
+    Script for pre-computing HPO-based results to the "pyxis_ranks_<PYXIS_DATE>" subfolder specified in the 
+    constant above.  This will do two things: 1) hit the PyxisMap endpoint specified in PyxisMapUtil and
+    2) perform the cosine score computation from HPOUtil.  Outputs are saved to files so we don't run this 
+    every time we want to train a new model.
     '''
     ontFN = '/Users/matt/githubProjects/LayeredGraph/HPO_graph_data/hp.obo'
     annotFN = '/Users/matt/githubProjects/LayeredGraph/HPO_graph_data/ALL_SOURCES_ALL_FREQUENCIES_phenotype_to_genes.txt'
@@ -50,6 +53,7 @@ def getPyxisMapResults():
     node, edges, parents, altIDMap = OntologyUtil.loadGraphStructure(ontFN)
     hpoOnt = HPOUtil.HPOUtil(ontFN, annotFN)
     
+    #load case data and go through them searching for HPO terms
     caseData = SummaryDBUtil.loadSummaryDatabase(altIDMap)
     for sl in sorted(caseData.keys()):
         #TODO: figure out how to properly handle this
@@ -104,9 +108,15 @@ def getPyxisMapResults():
                 else:
                     print('Failed to retrieve results for '+sl+' from HPOUtil')
 
-def runAnalysis():
+def loadFormattedData():
     '''
-    Core test function
+    Core test function.  This function is primarily about loading and formatting data prior to training/testing any 
+    classifiers.
+    @return - tuple (xFinal, yFinal, featureLabels, startIndices)
+        xFinal - an NxM matrix where N is the number of variants in our test/training set and M is the number of features; contains feature values
+        yFinal - an N length array where N is the number of variants in our test/training set; 1 if the variant was reported
+        featureLabels - an M length array containing feature labels for our output benefit
+        startIndices - a (C+1) length array containing the start indices of variants from an individual case
     '''
     pyxisRootDir = '/Users/matt/githubProjects/VarSight/pyxis_ranks_'+PYXIS_DATE
     
@@ -231,13 +241,16 @@ def runAnalysis():
     allCatValues = []
     allCatBreak = {}
     allClassifications = []
+    
+    #this will track the breaks between cases
+    startIndices = [0]
+
     for sl in sorted(caseData.keys()):
         #we only need to load those which actually have a return
         if len(caseData[sl]['primaries']) == 0:
             print('Skipping '+sl+', no primaries')
             continue
         primarySet = set([p['variant'] for p in caseData[sl]['primaries']])
-        #hpoTerms = caseData[sl]['hpoTerms']
         
         #if there is no CODICEM dump, we obviously can't do anything either
         codiDump = CodiDumpUtil.loadCodiDump(sl, fieldsOnly, geneFieldsOnly, seqFieldsOnly, transLabelsOnly)
@@ -281,6 +294,7 @@ def runAnalysis():
         print('Primary set: ', primarySet)
         foundPrimaries = set([])
         
+        #go through each variant now and format the inputs to be seen by a classifier
         for variant in codiDump:
             vData = []
             catData = []
@@ -294,12 +308,10 @@ def runAnalysis():
             #first, add in the best PyxisMap rank
             geneList = variant['genes']
             pyxisBest = min([pyxisRanks.get(g, (pyxisLen+1, 0.0))[0] / pyxisLen for g in geneList])
-            #vData.append(1.0 if pyxisBest <= 1.0 else 0.0)
             vData.append(pyxisBest)
             
             #now, add the best HPOUtil rank
             hpoBest = min([hpoRanks.get(g, (hpoLen+1, 0.0))[0] / hpoLen for g in geneList])
-            #TODO: if missing data marked
             vData.append(hpoBest)
             
             #now add all float values from CODICEM
@@ -328,8 +340,7 @@ def runAnalysis():
                 bestVal = reduceFunc([float(v) if v != 'NA' else invalidValue for v in variant[tvl]])
                 vData.append(bestVal)
 
-            #add categorical information
-            #for cDict in catMeta['allelicInformation']:
+            #add categorical information as described by "fields_metadata.json"
             for lg in labelBlocks:
                 for cDict in catMeta[lg]:
                     fieldKey = cDict['key']
@@ -380,19 +391,22 @@ def runAnalysis():
             #uncomment to see each variant's info
             #print(vName, isPrimary, vData, sep='\t')
             
-            #values.append(vData+catData)
+            #we add all values to our lists for the case
             values.append(vData)
             catValues.append(catData)
             classifications.append(isPrimary)
         
+        #occasionally primaries are missing, could be filter change OR from some targeted search by an analyst
         if sum(classifications) != len(primarySet):
             print('Some primaries were not found')
             print('All: ', primarySet)
             print('Found: ', foundPrimaries)
             #exit()
         
+        #if at least one primary is found, we will add to case to our test data
         if sum(classifications) > 0:
             allValues.append(values)
+            startIndices.append(startIndices[-1]+len(values))
             allCatValues.append(catValues)
             for k in catBreak:
                 if k not in allCatBreak:
@@ -405,14 +419,13 @@ def runAnalysis():
         print()
     
     #determine the category mode
-    OHE_MODE = 0
-    PCA_MODE = 1
-    PCA_BREAK_MODE = 2
+    OHE_MODE = 0 #categories are given *-hot encodings where * is the count of how many times that label appears
+    PCA_MODE = 1 #all categories are PCA-ed together and the top X PCA components are used
+    PCA_BREAK_MODE = 2 #each category has its own PCA, only X PCA components are allowed per category
     currentCatMode = PCA_BREAK_MODE
 
     featureLabels = (['PyxisMap', 'HPOUtil']+
         [l for l, d in floatValues]+
-        #[d['key'] for d in catMeta['allelicInformation']]+
         [l for l, r, d in geneValues]+
         [l for l, d in seqValues]+
         [l for l, r, d in transValues]
@@ -426,6 +439,7 @@ def runAnalysis():
         featureLabels += catLabels
 
     elif currentCatMode == PCA_MODE:
+        #PCA all categorical values together
         vVals = np.vstack(allValues)
         vCat = np.vstack(allCatValues)
 
@@ -441,6 +455,7 @@ def runAnalysis():
         featureLabels += ['PCA-'+str(x) for x in range(1, pcaCat.shape[1]+1)]
 
     elif currentCatMode == PCA_BREAK_MODE:
+        #PCA each category individually and allow PCA1 and PCA2 as inputs
         vVals = np.vstack(allValues)
         numComp = 2
         pcaBlocks = []
@@ -469,23 +484,81 @@ def runAnalysis():
     else:
         raise Exception('Unexpected currentCatMode')
 
-    #3 - train and test the learners
-    #xFinal = np.vstack(allValues)
+    #return the values
     yFinal = np.array(np.hstack(allClassifications), dtype='int64')
 
-    runClassifiers(xFinal, yFinal, featureLabels)
+    return (xFinal, yFinal, featureLabels, startIndices)
 
-def runClassifiers(values, classifications, featureLabels):
+def runClassifiers(values, classifications, featureLabels, startIndices):
     '''
     @param values - a matrix with R rows and C columns, where there are "C" features
     @param classifications - an array of length R corresponding to the above values
+    @param featureLabels - C length array containing labels (strings) for the features
+    @param startIndices - the startIndices of individual cases in the training set
     '''
     print('Values:', values.shape)
+    
+    #V1
+    #Classifications (and bincount): (36346,) [36165   181]
+    #Num cases: 108
     print('Classifications (and bincount):', classifications.shape, np.bincount(classifications))
-    
+    print('Num cases:', len(startIndices)-1)
+
     #split the data
-    train_x, test_x, train_y, test_y = train_test_split(values, classifications, test_size=0.25, stratify=classifications)
-    
+    CASE_BASED_SPLIT = True
+    TEST_SIZE = 0.25
+
+    if CASE_BASED_SPLIT:
+        #we decided to split the train/test by case, going to need some custom stuff here
+        #we want to make sure ~25% of the true positives are in the test set and the remaining in the training set
+        #false positives will likely be out of balance but that's okay because we have a metric crap ton of them
+        trainXArray = []
+        trainYArray = []
+        train_indices = [0]
+        tpTrain = 0
+        testXArray = []
+        testYArray = []
+        test_indices = [0]
+        tpTest = 0
+        
+        #ratio of TRAIN:TEST
+        invRat = 1.0/TEST_SIZE - 1
+
+        for x in range(0, len(startIndices)-1):
+            st = startIndices[x]
+            et = startIndices[x+1]
+            tpCount = np.sum(classifications[st:et])
+            if tpTrain <= invRat*tpTest:
+                #we need more in our training
+                trainXArray.append(values[st:et])
+                trainYArray.append(classifications[st:et])
+                train_indices.append(train_indices[-1]+(et-st))
+                tpTrain += tpCount
+            else:
+                #we need more in our test
+                testXArray.append(values[st:et])
+                testYArray.append(classifications[st:et])
+                test_indices.append(test_indices[-1]+(et-st))
+                tpTest += tpCount
+        
+        #join them all together
+        train_x = np.vstack(trainXArray)
+        train_y = np.hstack(trainYArray)
+        test_x = np.vstack(testXArray)
+        test_y = np.hstack(testYArray)
+
+        #V1
+        #split sizes (26820, 50) (9526, 50) (26820,) (9526,)
+
+    else:
+        #train without any regards to case labels
+        train_x, test_x, train_y, test_y = train_test_split(values, classifications, test_size=TEST_SIZE, stratify=classifications)
+
+        #V1
+        #split sizes (27259, 50) (9087, 50) (27259,) (9087,)
+
+    print('split sizes', train_x.shape, test_x.shape, train_y.shape, test_y.shape)
+
     #class_weight="balanced" is when there is a major imbalance between the number of true negatives and true positives
     EXACT_MODE=0
     GRID_MODE=1
@@ -504,7 +577,7 @@ def runClassifiers(values, classifications, featureLabels):
         }),
         #('svc_bal', SVC(probability=True, class_weight="balanced")),#this one doesn't scale well past 10k samples
         #('mlp', MLPClassifier()),#this one doesn't work, presumably because there is no balanced option
-        ('LogReg_bal', LogisticRegression(random_state=0, class_weight='balanced', penalty='l2', C=0.01, solver='newton-cg', max_iter=200), 
+        ('LogReg_bal', LogisticRegression(random_state=0, class_weight='balanced', penalty='l2', C=0.01, solver='liblinear', max_iter=200), 
         {
             'random_state' : [0],
             'class_weight' : ['balanced'],
@@ -593,6 +666,31 @@ def runClassifiers(values, classifications, featureLabels):
         prs.append((recall, precision))
         print('\tpr_auc', pr_auc)
         
+        if CASE_BASED_SPLIT:
+            ranks = []
+
+            #now do the test sets as if they were individual cases
+            for x in range(0, len(test_indices)-1):
+                st = test_indices[x]
+                et = test_indices[x+1]
+
+                case_x = test_x[st:et]
+                case_y = test_y[st:et]
+
+                #get the probabilities and sort them with most likely reported first
+                probs = clf.predict_proba(case_x)[:, 1]
+                ordered = np.argsort(probs)[::-1]
+
+                for i, v in enumerate(ordered):
+                    if case_y[v] == 1:
+                        ranks.append(i)
+            
+            print(len(ranks), ranks)
+            print('mean:', np.mean(ranks))
+            print('stdev:', np.std(ranks))
+            print('median:', np.median(ranks))
+
+
         if currentMode == EXACT_MODE:
             #cross validation scores
             cv = StratifiedKFold(n_splits=10)
@@ -650,6 +748,13 @@ def runClassifiers(values, classifications, featureLabels):
     plt.grid()
     plt.savefig(plotFN)
     plt.close()
+
+def runAnalysis():
+    '''
+    Core function for joining our pieces together
+    '''
+    (xFinal, yFinal, featureLabels, startIndices) = loadFormattedData()
+    runClassifiers(xFinal, yFinal, featureLabels, startIndices)
 
 if __name__ == '__main__':
     #this will re-run the PyxisMap tests, should update dates though
