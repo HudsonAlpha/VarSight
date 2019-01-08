@@ -2,6 +2,7 @@
 Primary analysis script for testing various learning methods
 '''
 
+import argparse as ap
 import datetime
 import json
 import matplotlib.pyplot as plt
@@ -34,7 +35,13 @@ from sklearn.model_selection import StratifiedKFold
 from sklearn.model_selection import train_test_split
 from sklearn.neural_network import MLPClassifier
 
+#CONSTANTS
 PYXIS_DATE='01042019'   
+
+#mode for analyzing the classifiers
+EXACT_MODE=0
+GRID_MODE=1
+RANDOM_MODE=2
 
 def getPyxisMapResults():
     '''
@@ -499,8 +506,9 @@ def loadFormattedData():
 
     return (xFinal, yFinal, featureLabels, startIndices, allRepDicts)
 
-def runClassifiers(values, classifications, featureLabels, startIndices, allRepDicts):
+def runClassifiers(args, values, classifications, featureLabels, startIndices, allRepDicts):
     '''
+    @param args - any arguments from the command line argparse can be accessed here
     @param values - a matrix with R rows and C columns, where there are "C" features
     @param classifications - an array of length R corresponding to the above values
     @param featureLabels - C length array containing labels (strings) for the features
@@ -587,10 +595,7 @@ def runClassifiers(values, classifications, featureLabels, startIndices, allRepD
     resultsDict['TEST_CASES'] = len(test_indices)-1
 
     #class_weight="balanced" is when there is a major imbalance between the number of true negatives and true positives
-    EXACT_MODE=0
-    GRID_MODE=1
-    RANDOM_MODE=2
-    currentMode=GRID_MODE
+    currentMode=args.training_mode
 
     #record the training method used
     resultsDict['TRAINING_MODE'] = ['EXACT_MODE', 'GRID_MODE', 'RANDOM_MODE'][currentMode]
@@ -965,16 +970,16 @@ def generateLaTeXResult(d):
     fp.write(rendered)
     fp.close()
 
-def runAnalysis():
+def runAnalysis(args):
     '''
     Core function for joining our pieces together
     '''
     resultJsonFN = '/Users/matt/githubProjects/VarSight/paper/results.json'
-    REGENERATE_DATA = True
+    REGENERATE_DATA = args.regenerate
 
     if REGENERATE_DATA or not os.path.exists(resultJsonFN):
         (xFinal, yFinal, featureLabels, startIndices, allRepDicts) = loadFormattedData()
-        resultsDict = runClassifiers(xFinal, yFinal, featureLabels, startIndices, allRepDicts)
+        resultsDict = runClassifiers(args, xFinal, yFinal, featureLabels, startIndices, allRepDicts)
 
         fp = open(resultJsonFN, 'wt+')
         json.dump(resultsDict, fp, default=jsonDumpFix)
@@ -989,8 +994,23 @@ def runAnalysis():
     generateLaTeXResult(resultsDict)
 
 if __name__ == '__main__':
-    #this will re-run the PyxisMap tests, should update dates though
-    #getPyxisMapResults()
+    p = ap.ArgumentParser(description='script for running analysis for VarSight', formatter_class=ap.RawTextHelpFormatter)
+
+    sp = p.add_subparsers(dest='subparser')
+    sp1 = sp.add_parser('gather', help='gather HPO-based results for use later')
+
+    sp2 = sp.add_parser('analyze', help='train and test the classifiers')
+    sp2.add_argument('-R', '--regenerate', dest='regenerate', action='store_true', default=False, help='regenerate all test results even if already available')
+    ex_group = sp2.add_mutually_exclusive_group()
+    ex_group.add_argument('-e', '--exact-mode', dest='training_mode', action='store_const', const=EXACT_MODE, help='use the dev-specified hyperparameters (single-execution)', default=EXACT_MODE)
+    ex_group.add_argument('-g', '--grid-mode', dest='training_mode', action='store_const', const=GRID_MODE, help='perform a grid search for the best hyperparameters (long multi-execution)', default=EXACT_MODE)
+    ex_group.add_argument('-r', '--random-mode', dest='training_mode', action='store_const', const=RANDOM_MODE, help='perform a random search for the best hyperparameters (short multi-execution)', default=EXACT_MODE)
     
-    #core tests
-    runAnalysis()
+    args = p.parse_args()
+    
+    if args.subparser == 'gather':
+        #this will re-run the PyxisMap tests, should update dates though
+        getPyxisMapResults()
+    elif args.subparser == 'analyze':
+        #core tests
+        runAnalysis(args)
