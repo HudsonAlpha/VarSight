@@ -110,8 +110,7 @@ def getPyxisMapResults():
 
 def loadFormattedData():
     '''
-    Core test function.  This function is primarily about loading and formatting data prior to training/testing any 
-    classifiers.
+    This function is primarily about loading and formatting data prior to training/testing any classifiers.
     @return - tuple (xFinal, yFinal, featureLabels, startIndices, allRepDicts)
         xFinal - an NxM matrix where N is the number of variants in our test/training set and M is the number of features; contains feature values
         yFinal - an N length array where N is the number of variants in our test/training set; 1 if the variant was reported
@@ -250,8 +249,15 @@ def loadFormattedData():
     for sl in sorted(caseData.keys()):
         #we only need to load those which actually have a return
         if len(caseData[sl]['primaries']) == 0:
-            print('Skipping '+sl+', no primaries')
+            #I don't think we care about seeing these at all
+            #print(sl, 'NO_PRIMARIES', sep=',')
             continue
+        
+        if len(caseData[sl]['hpoTerms']) == 0:
+            #we don't care to see these either, just incomplete data :(
+            #print(sl, 'NO_HPOTERMS', sep=',')
+            continue
+
         primarySet = set([p['variant'] for p in caseData[sl]['primaries']])
         primaryDict = {p['variant'] : p for p in caseData[sl]['primaries']}
         assert(len(primaryDict) == len(caseData[sl]['primaries']))
@@ -259,20 +265,18 @@ def loadFormattedData():
         #if there is no CODICEM dump, we obviously can't do anything either
         codiDump = CodiDumpUtil.loadCodiDump(sl, fieldsOnly, geneFieldsOnly, seqFieldsOnly, transLabelsOnly)
         if len(codiDump) == 0:
-            print('Skipping '+sl+', empty or absent CODICEM dump')
+            print(sl, 'NO_CODICEM_DUMP', sep=',')
             continue
         
         #finally, make sure we have a PyxisMap dump we can use
         pyxisFN = pyxisRootDir+'/'+sl+'_pyxis.json'
         if not os.path.exists(pyxisFN):
-            print('Skipping '+sl+', no PyxisMap dump available')
+            print(sl, 'NO_PYXISMAP_DUMP', sep=',')
             continue
         fp = open(pyxisFN, 'r')
         pyxisJson = json.load(fp)
         fp.close()
         
-        print("Loading "+sl+"...")
-
         #reformat for easy lookups
         pyxisRanks = pyxisJson['ranks']
         pyxisLen = pyxisJson['rankLen']
@@ -280,12 +284,14 @@ def loadFormattedData():
         #now do hpoUtil also
         hpoFN = pyxisRootDir+'/'+sl+'_hpoutil.json'
         if not os.path.exists(hpoFN):
-            print('Skipping '+sl+', no HPOUtil dump available')
+            print(sl, 'NO_HPOUTIL_DUMP', sep=',')
             continue
         fp = open(hpoFN, 'r')
         hpoJson = json.load(fp)
         fp.close()
         
+        #print("Loading "+sl+"...")
+
         hpoRanks = hpoJson['ranks']
         hpoLen = hpoJson['rankLen']
         
@@ -296,7 +302,7 @@ def loadFormattedData():
         classifications = []
         repDicts = []
         
-        print('Primary set: ', primarySet)
+        #print('Primary set: ', primarySet)
         foundPrimaries = set([])
         
         #go through each variant now and format the inputs to be seen by a classifier
@@ -404,11 +410,8 @@ def loadFormattedData():
         
         #occasionally primaries are missing, could be filter change OR from some targeted search by an analyst
         if sum(classifications) != len(primarySet):
-            print('Some primaries were not found')
-            print('All: ', primarySet)
-            print('Found: ', foundPrimaries)
-            #exit()
-        
+            print(sl, 'SOME_MISSING', primarySet, foundPrimaries, sep=',')
+
         #if at least one primary is found, we will add to case to our test data
         if sum(classifications) > 0:
             allValues.append(values)
@@ -421,9 +424,9 @@ def loadFormattedData():
             allClassifications.append(classifications)
             allRepDicts += repDicts
         else:
-            print('Ignoring all variants from '+sl+', no primaries found in CODICEM dump')
+            print(sl, 'ALL_MISSING', primarySet, foundPrimaries, sep=',')
         
-        print()
+        #print()
     
     #determine the category mode
     OHE_MODE = 0 #categories are given *-hot encodings where * is the count of how many times that label appears
@@ -587,7 +590,7 @@ def runClassifiers(values, classifications, featureLabels, startIndices, allRepD
     EXACT_MODE=0
     GRID_MODE=1
     RANDOM_MODE=2
-    currentMode=EXACT_MODE
+    currentMode=GRID_MODE
 
     #record the training method used
     resultsDict['TRAINING_MODE'] = ['EXACT_MODE', 'GRID_MODE', 'RANDOM_MODE'][currentMode]
@@ -804,11 +807,96 @@ def runClassifiers(values, classifications, featureLabels, startIndices, allRepD
             stds = clf.cv_results_['std_test_score']
             for mean, std, params in zip(means, stds, clf.cv_results_['params']):
                 print("\t\t%0.3f (+/-%0.03f) for %r" % (mean, std * 2, params))
+                if params == clf.best_params_:
+                    resultsDict['CLASSIFIERS'][clf_label]['CV10_BALANCED_ACCURACY'] = (mean, std*2)
             
             #TODO: do we want anything from these results or do we care?
             
         print()
     
+    #before making these curves, lets add in some controls for comparison
+    comparedScores = ['CADD Scaled', 'HPOUtil']
+    csRocs = []
+    csAucs = []
+    csPrs = []
+    csPrAucs = []
+    resultsDict['COMPARISON'] = {}
+    resultsDict['CS_LABELS'] = comparedScores
+    for csLabel in comparedScores:
+        resultsDict['COMPARISON'][csLabel] = {}
+
+        dataIndex = featureLabels.index(csLabel)
+        dataColumn = test_x[:, dataIndex]
+        
+        #these have to be reversed because they are rank-based (i.e. smaller is better)
+        if csLabel in ['HPOUtil', 'PyxisMap']:
+            dataColumn = 1-dataColumn
+
+        false_positive_rate, true_positive_rate, thresholds = roc_curve(test_y, dataColumn)
+        roc_auc = auc(false_positive_rate, true_positive_rate)
+        csAucs.append(roc_auc)
+        csRocs.append((false_positive_rate, true_positive_rate))
+        resultsDict['COMPARISON'][csLabel]['ROC_AUC'] = roc_auc
+
+        precision, recall, pr_thresholds = precision_recall_curve(test_y, dataColumn)
+        pr_auc = auc(recall, precision)
+        csPrAucs.append(pr_auc)
+        csPrs.append((recall, precision))
+        resultsDict ['COMPARISON'][csLabel]['PR_AUC'] = pr_auc
+        
+        if CASE_BASED_SPLIT:
+            ranks = []
+            rp = []
+            pDict = {
+                'VARIANT_OF_UNCERTAIN_SIGNIFICANCE' : 3,
+                'LIKELY_PATHOGENIC' : 4,
+                'PATHOGENIC' : 5
+            }
+            pList = ['VARIANT_OF_UNCERTAIN_SIGNIFICANCE', 'LIKELY_PATHOGENIC', 'PATHOGENIC']
+            #pList = ['LIKELY_PATHOGENIC', 'PATHOGENIC']
+
+            rDict = {}
+            
+            #now do the test sets as if they were individual cases
+            for x in range(0, len(test_indices)-1):
+                st = test_indices[x]
+                et = test_indices[x+1]
+
+                #dataColumn is sorted such that highest is biggest rank
+                case_x = dataColumn[st:et]
+                case_y = test_y[st:et]
+                case_d = test_dicts[st:et]
+
+                #get the probabilities and sort them with most likely reported first
+                ordered = np.argsort(case_x)[::-1]
+
+                for i, v in enumerate(ordered):
+                    if case_y[v] == 1:
+                        pathLevel = pDict[case_d[v]['path_level']]
+                        ranks.append(i)
+                        rp.append(pathLevel)
+
+                        if (pathLevel not in rDict):
+                            rDict[pathLevel] = []
+                        rDict[pathLevel].append(i)
+            print(csLabel+':')
+            print('\tNum ranked:', len(ranks))
+            print('\tRanks:', ranks)
+            print('\tPatho:', rp)
+            print('\tmean:', np.mean(ranks))
+            print('\tstdev:', np.std(ranks))
+            print('\tmedian:', np.median(ranks))
+            resultsDict['COMPARISON'][csLabel]['TEST_RANKINGS'] = {}
+            resultsDict['COMPARISON'][csLabel]['TEST_RANKINGS']['OVERALL'] = ranks
+
+            for v in pList:
+                print('\t'+v)
+                print('\t\tRanks:', rDict[pDict[v]])
+                print('\t\tmean:', np.mean(rDict[pDict[v]]))
+                print('\t\tstdev:', np.std(rDict[pDict[v]]))
+                print('\t\tmedian:', np.median(rDict[pDict[v]]))
+                resultsDict['COMPARISON'][csLabel]['TEST_RANKINGS'][v] = rDict[pDict[v]]
+        
     #ROC curve
     plotFN = '/Users/matt/githubProjects/VarSight/images/codi_rf_roc.png'
     plt.figure()
@@ -817,6 +905,9 @@ def runClassifiers(values, classifications, featureLabels, startIndices, allRepD
     for i, (label2, raw_clf, raw_params) in enumerate(classifiers):
         plt.plot(rocs[i][0], rocs[i][1], label=('%s (%0.4f)' % (label2, aucs[i])))
     
+    for i, label2 in enumerate(comparedScores):
+        plt.plot(csRocs[i][0], csRocs[i][1], label=('%s (%0.4f)' % (label2, csAucs[i])))
+
     plt.xlabel('False positive rate')
     plt.ylabel('True positive rate')
     plt.title('ROC curve - all data')
@@ -833,6 +924,9 @@ def runClassifiers(values, classifications, featureLabels, startIndices, allRepD
     
     for i, (label2, raw_clf, raw_params) in enumerate(classifiers):
         plt.plot(prs[i][0], prs[i][1], label=('%s (%0.4f)' % (label2, pr_aucs[i])))
+    
+    for i, label2 in enumerate(comparedScores):
+        plt.plot(csPrs[i][0], csPrs[i][1], label=('%s (%0.4f)' % (label2, csPrAucs[i])))
     
     plt.xlabel('Recall')
     plt.ylabel('Precision')
@@ -876,7 +970,7 @@ def runAnalysis():
     Core function for joining our pieces together
     '''
     resultJsonFN = '/Users/matt/githubProjects/VarSight/paper/results.json'
-    REGENERATE_DATA = False
+    REGENERATE_DATA = True
 
     if REGENERATE_DATA or not os.path.exists(resultJsonFN):
         (xFinal, yFinal, featureLabels, startIndices, allRepDicts) = loadFormattedData()

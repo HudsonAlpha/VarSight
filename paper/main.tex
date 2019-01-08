@@ -1,5 +1,6 @@
 \documentclass{bioinfo}
 \usepackage{multirow}
+\usepackage{hhline}
 \copyrightyear{2015} \pubyear{2015}
 
 \access{Advance Access Publication Date: Day Month Year}
@@ -32,6 +33,8 @@ online.}
 \maketitle
 
 \section{Introduction}
+
+
 WGS is currently being used as a molecular diagnostic tool for rare disease; blood draw + phenotypes are provided to analysis centers and these go through a standard alignment/variant calling pipeline
 
 Because of size of data, variants are typically filtered down based on rare disease expectations; these variants are manually checked by two or more analysts and reported to clinical site
@@ -41,16 +44,25 @@ Manual curation is tedious and prone to error due to variant fatigue; thus tools
 %\enlargethispage{12pt}
 
 \section{Approach}
+In this paper, we tested the application of classification algorithms for predicting whether a given variant in a patient sample would be returned on a clinical report.  To do this, we used patient samples from the UDN \citep{ramoni2017} who received genome sequencing and received at least one variant on their clinical report.  We then extracted data directly from the annotation and filtering tool used by our case analysts in order to replicate their standard view of the patient.  Additionally, we extracted a list of phenotype terms provided by the clinical site to pair with each patient.  These phenotype terms were processed with two scoring systems to provide phenotype scores for each variant.  Finally, each variant was either labeled as ``returned" or ``not returned" depending on whether it was ultimately sent back to the clinical site.
 
-Here we test methods that take phenotype, gene, transcript, and variant level annotations from the filtered variant list and predict whether a variant will ultimately be reported back to the clinical site.
-
-The methods provide a boolean predictor and a ranking system.
+Given the above variant information, we split the data into training and testing sets for measuring the performance of classifiers.  We tested four classifiers that are readily available in the sklearn (CITE:XXX) and imblearn (CITE:XXX) Python modules.  After tuning each classifier, we generated summaries of the performance of each measure from a boolean classification perspective and from an ordered variant ranking perspective.
 
 \begin{methods}
 \section{Methods}
+\subsection{Patient selection}
+All samples were selected from the cohort of genome sequencing samples originally sequenced at HudsonAlpha Institute for Biotechnology (HAIB) Sequencing Center of the Undiagnosed Diseases Network \citep{ramoni2017}.  The DNA was prepared from blood samples (with few exceptions) and sequenced via standard operation protocols for use as a Laboratory-Developed Test (LDT) in the HAIB CAP/CLIA lab.  After sequencing, we followed GATK best practices \citep{depristo2011} to align to the hg19 reference with BWA-mem (CITE: XXX).  Aligned sequences we processed via GATK for base quality score recalibration, indel realignment, and duplicate removal.  Finally, SNV and indel variants were joint genotyped, again according to GATK best practices \citep{depristo2011}.  The end result of this pipeline is a Variant Call Format (VCF) file used in the following sections.
+
+After VCF generation, clinical analysts followed various published recommendations (e.g. \citealp{worthey2017, roy2018}) to annotate and filter variants from proband samples.  
+%Specifically, we used a tool called CODICEM (CITE:XXX) to annotate, filter, and ultimately generate a report for each proband sample.  
+In our analysis, we focused on variants that were clinically reported as ``primary", meaning the analysts believe the variant to be directly related to the patient's phenotype.  Secondary or incidental variant findings were excluded for our analysis.  We required each sample included in our analysis to be a proband sample and to have at least one primary variant that was returned on the final clinical report.  At the time of writing, this amounted to XXX primary variants from a total of XXX proband samples.
+
+TODO: modify above to reflect the need for phenotips also
 
 \subsection{Variant annotation}
-CODI does most of it; we use PyxisMap and HPOUtil for the rest
+For variant annotation, we used the tool CODICEM (CITE:XXX) that was developed at HudsonAlpha Institute for Biotechnology.  In short, the software loads patient variants from a VCF and annotates the variants with over fifty annotations that a case analyst can use to interpret a patient's variant.  These annotations include: variant level annotations such as CADD (CITE:XXX), conservation scores (CITE:XXX, phylop, phastcon, and GERP), and population frequencies (CITE:XXX gnomad); gene level annotations such as haploinsufficiency scores (CITE: XXX, HIS and GHIS), intolerance scores (CITE: XXX, RVIS), and disease associations (CITE: XXX, HGMD, ClinVar, OMIM); and transcript level annotations such as amino acid change scores (CITE: XXX, PolyPhen, SIFT, PROVEAN) and splice site impact scores (CITE: XXX, AdaBoost and RandomForest splice predictors).  Additionally, if the variant has been previously curated through HGMD or ClinVar (CITE: XXX), those annotations are also made available to the analysts.
+
+The above annotations are all agnostic of the patient phenotype.  In order to incorporate patient phenotype information, we used two methods to rank genes using the Human Phenotype Ontology (HPO) (CITE: XXX) terms provided by the clinical sites.  We then annotated each variant with the scores from their corresponding gene.  The first method uses base annotations provided by the HPO to calculate a simple cosine score (CITE: XXX) between the patient phenotype and each gene.  This method tends to be more conservative because it relies on curated annotations from the HPO.  The second method, a tool called PyxisMap, uses the same annotations from the HPO, but adds in automatically text-mined data from NCBI's PubTator (CITE: XXX) and performs a Random-Walk with Restart (CITE:XXX) on the HPO ontology.  This methods has the added benefit of incorporating fresh gene-phenotype connections from newer papers, but tends to be more error prone due to the imprecision of the text-mining.
 
 \subsection{Data cleaning}
 Numerical data is given a number with out-of-bounds defaults
@@ -73,6 +85,8 @@ Results go here
 \input{data_rendered.tex}
 \end{tabular}
 \end{table*}
+
+more results go here
 
 \subsection{blah blah}
 Mathy stuff: Precision, recall, AUC, ROC, etc.
@@ -107,36 +121,19 @@ This work has been supported by the... Text Text  Text Text.\vspace*{-12pt}
 
 \begin{thebibliography}{}
 
-\bibitem[Bofelli {\it et~al}., 2000]{Boffelli03}
-Bofelli,F., Name2, Name3 (2003) Article title, {\it Journal Name}, {\bf 199}, 133-154.
+%CODICEM? - http://envisiongenomics.com/codicem-analysis-platform/
 
-\bibitem[Bag {\it et~al}., 2001]{Bag01}
-Bag,M., Name2, Name3 (2001) Article title, {\it Journal Name}, {\bf 99}, 33-54.
+%GATK best practices
+\bibitem[DePristo {\it et~al}., 2011]{depristo2011} DePristo, Mark A., \textit{et~al.} "A framework for variation discovery and genotyping using next-generation DNA sequencing data." {\it Nature genetics} 43.5 (2011): 491.
 
-\bibitem[Yoo \textit{et~al}., 2003]{Yoo03}
-Yoo,M.S. \textit{et~al}. (2003) Oxidative stress regulated genes
-in nigral dopaminergic neurnol cell: correlation with the known
-pathology in Parkinson's disease. \textit{Brain Res. Mol. Brain
-Res.}, \textbf{110}(Suppl. 1), 76--84.
+%UDN paper
+\bibitem[Ramoni {\it et~al}., 2017]{ramoni2017} Ramoni, Rachel B. \textit{et~al.} "The undiagnosed diseases network: accelerating discovery about health and disease." {\it The American Journal of Human Genetics} 100.2 (2017): 185-192.
 
-\bibitem[Lehmann, 1986]{Leh86}
-Lehmann,E.L. (1986) Chapter title. \textit{Book Title}. Vol.~1, 2nd edn. Springer-Verlag, New York.
+%
+\bibitem[Roy {\it et~al}., 2018]{roy2018} Roy, Somak, \textit{et~al.} "Standards and guidelines for validating next-generation sequencing bioinformatics pipelines: a joint recommendation of the Association for Molecular Pathology and the College of American Pathologists." {\it The Journal of Molecular Diagnostics} 20.1 (2018): 4-27.
 
-\bibitem[Crenshaw and Jones, 2003]{Cre03}
-Crenshaw, B.,III, and Jones, W.B.,Jr (2003) The future of clinical
-cancer management: one tumor, one chip. \textit{Bioinformatics},
-doi:10.1093/bioinformatics/btn000.
-
-\bibitem[Auhtor \textit{et~al}. (2000)]{Aut00}
-Auhtor,A.B. \textit{et~al}. (2000) Chapter title. In Smith, A.C.
-(ed.), \textit{Book Title}, 2nd edn. Publisher, Location, Vol. 1, pp.
-???--???.
-
-\bibitem[Bardet, 1920]{Bar20}
-Bardet, G. (1920) Sur un syndrome d'obesite infantile avec
-polydactylie et retinite pigmentaire (contribution a l'etude des
-formes cliniques de l'obesite hypophysaire). PhD Thesis, name of
-institution, Paris, France.
+%Worthey WGS pipeline
+\bibitem[Worthey, 2017]{worthey2017} Worthey, Elizabeth A. "Analysis and Annotation of Whole-Genome or Whole-Exome Sequencing Derived Variants for Clinical Diagnosis." {\it Current protocols in human genetics} 95.1 (2017): 9-24.
 
 \end{thebibliography}
 \end{document}
