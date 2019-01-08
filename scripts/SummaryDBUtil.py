@@ -2,6 +2,7 @@
 This file should contain helper functions to load the UDN summary DB information
 '''
 
+import csv
 import openpyxl
 
 def loadSummaryDatabase(altIDMap):
@@ -56,38 +57,6 @@ def loadSummaryDatabase(altIDMap):
     SUMMARY_DB_FILENAME = '/Users/matt/githubProjects/VarSight/data/UDN Summary Database_v4.xlsx'
     wb = openpyxl.load_workbook(SUMMARY_DB_FILENAME)
     ret = {}
-    
-    '''
-    #this was the version used with v3, formatting changed though
-    #first load HPO terms for each patient
-    hpoSheet = wb['Patient HPO terms']
-    hpoDict = {}
-    for i, row in enumerate(hpoSheet):
-        if i == 0:
-            for j, c in enumerate(row):
-                if c.value != None:
-                    hpoDict[c.value] = j
-        else:
-            slids = row[hpoDict['SL#']].value
-            hpo = row[hpoDict['Phenotips HPO']].value
-            
-            if slids != None:
-                for slid in slids.split(','):
-                    if hpo != None:
-                        #create this entry if it doesn't exist
-                        if (slid not in ret):
-                            ret[slid] = {
-                                "hpoTerms" : set([])
-                            }
-                        
-                        #add each HPO term
-                        for h in hpo.split(','):
-                            if h[0:3] != 'HP:' or len(h) != 10:
-                                print('Ignoring term:', h)
-                            else:
-                                #get the alternate ID if it exists, otherwise use the normal
-                                ret[slid]['hpoTerms'].add(altIDMap.get(h, h))
-    '''
 
     #first load HPO terms for each patient
     hpoSheet = wb['Phenotips_HPO_04Jan19']
@@ -118,6 +87,8 @@ def loadSummaryDatabase(altIDMap):
                             #get the alternate ID if it exists, otherwise use the normal
                             ret[slid]['hpoTerms'].add(altIDMap.get(h, h))
     
+    '''
+    #this was the original primary getter, but it changed, so I need to re-parse from a CSV
     #second load the primaries
     primarySheet = wb['Primary variants']
     ALLOWED_PATHOGENICITY = set(['PATHOGENIC', 'LIKELY_PATHOGENIC', 'VARIANT_OF_UNCERTAIN_SIGNIFICANCE'])
@@ -149,7 +120,50 @@ def loadSummaryDatabase(altIDMap):
                     "variant" : coordsMod,
                     "path_level" : pathLevel
                 })
-    
+    '''
+
+    #second, load the primaries
+    fpcsv = open('/Users/matt/githubProjects/VarSight/CODI_metadata/3Jan2019_UDN_Variants_all.csv', 'rt')
+    primarySheet = csv.DictReader(fpcsv)
+    revOrderPath = ['PATHOGENIC', 'LIKELY_PATHOGENIC', 'VARIANT_OF_UNCERTAIN_SIGNIFICANCE', 'BENIGN']
+    ALLOWED_PATHOGENICITY = set(revOrderPath[0:3])
+    for row in primarySheet:
+        slid = row['Sample']
+        genes = row['Gene']
+        coords = row['Genomic Location']
+        pathLevel = row['Classification']
+
+        weakestPL = max([revOrderPath.index(pl) for pl in pathLevel.split(',')])
+        assert(weakestPL >= 0)
+
+        if (slid != None and genes != None and pathLevel != None and coords != None and
+            pathLevel in ALLOWED_PATHOGENICITY):
+            #strip out all g.
+            coordsMod = coords.replace('g.', '').replace('Chr', 'chr')
+
+            #there are some instances with multiple reporting categories, default to the lower category
+            if (slid not in ret):
+                ret[slid] = {}
+            if ("primaries" not in ret[slid]):
+                ret[slid]['primaries'] = []
+
+            for pDict in ret[slid]['primaries']:
+                if coordsMod == pDict['variant']:
+                    #there are instances where the old version was missing a gene the new had
+                    pDict['genes'] = list(set(pDict['genes']) | set(genes.split(',')))
+                    weakestPL = max(weakestPL, revOrderPath.index(pDict['path_level']))
+                    pDict['path_level'] = revOrderPath[weakestPL]
+                    break
+            else:
+                print(slid, genes, pathLevel, coordsMod, sep='\t')
+                ret[slid]['primaries'].append({
+                    "genes" : list(set(genes.split(','))),
+                    "variant" : coordsMod,
+                    "path_level" : revOrderPath[weakestPL]
+                })
+
+    fpcsv.close()
+
     #add empty things for consistency to all keys that are missing them
     for sl in ret:
         if ('hpoTerms' not in ret[sl]):
