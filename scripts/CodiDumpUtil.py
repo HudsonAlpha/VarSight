@@ -21,7 +21,7 @@ def loadCodiDump(sl, EXTRA_FIELDS, GENE_FIELDS, SEQ_FIELDS, TRANSCRIPT_FIELDS):
     #make sure the file exists
     fn = '/Users/matt/githubProjects/VarSight/CLI_primary_V6/'+sl+'_results.json'
     if not os.path.exists(fn):
-        print('Missing file: '+fn)
+        #print('Missing file: '+fn)
         return []
     
     #load the json file
