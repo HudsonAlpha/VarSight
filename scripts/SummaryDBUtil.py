@@ -86,41 +86,6 @@ def loadSummaryDatabase(altIDMap):
                         else:
                             #get the alternate ID if it exists, otherwise use the normal
                             ret[slid]['hpoTerms'].add(altIDMap.get(h, h))
-    
-    '''
-    #this was the original primary getter, but it changed, so I need to re-parse from a CSV
-    #second load the primaries
-    primarySheet = wb['Primary variants']
-    ALLOWED_PATHOGENICITY = set(['PATHOGENIC', 'LIKELY_PATHOGENIC', 'VARIANT_OF_UNCERTAIN_SIGNIFICANCE'])
-    primaryDict = {}
-    for i, row in enumerate(primarySheet):
-        if i == 0:
-            for j, c in enumerate(row):
-                if c.value != None:
-                    primaryDict[c.value] = j
-        else:
-            slid = row[primaryDict['SL#']].value
-            genes = row[primaryDict['GENE']].value
-            coords = row[primaryDict['GENOMIC COORDINATES']].value
-            pathLevel = row[primaryDict['REPORTED PATHOGENICITY']].value
-            
-            if (slid != None and genes != None and pathLevel != None and coords != None and
-                pathLevel in ALLOWED_PATHOGENICITY):
-                #strip out all g.
-                coordsMod = coords.replace('g.', '')
-                
-                if (slid not in ret):
-                    ret[slid] = {}
-                if ("primaries" not in ret[slid]):
-                    ret[slid]['primaries'] = []
-                    
-                print(slid, genes, pathLevel, coordsMod, sep='\t')
-                ret[slid]['primaries'].append({
-                    "genes" : list(set(genes.split(','))),
-                    "variant" : coordsMod,
-                    "path_level" : pathLevel
-                })
-    '''
 
     #second, load the primaries
     fpcsv = open('/Users/matt/githubProjects/VarSight/CODI_metadata/3Jan2019_UDN_Variants_all.csv', 'rt')
@@ -155,7 +120,7 @@ def loadSummaryDatabase(altIDMap):
                     pDict['path_level'] = revOrderPath[weakestPL]
                     break
             else:
-                print(slid, genes, pathLevel, coordsMod, sep='\t')
+                #print(slid, genes, pathLevel, coordsMod, sep='\t')
                 ret[slid]['primaries'].append({
                     "genes" : list(set(genes.split(','))),
                     "variant" : coordsMod,
