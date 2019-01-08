@@ -1,0 +1,156 @@
+{
+    "allelicInformation" : [
+        {
+            "key" : "Type",
+            "interpret" : "single",
+            "values" : {
+                "SNV" : 0,
+                "INSERTION" : 1,
+                "DELETION" : 2
+            }
+        },
+        {
+            "key" : "HGMD assessment type",
+            "interpret" : "multiple",
+            "accepted" : [
+                "DFP", "DM", "FP", "DP"
+            ],
+            "ignored" : [
+                "NA"
+            ]
+        },
+        {
+            "key" : "HGMD association confidence",
+            "interpret" : "multiple",
+            "accepted" : [
+                "High", "Low"
+            ],
+            "ignored" : [
+                "NA"
+            ]
+        },
+        {
+            "key" : "ClinVar Classification",
+            "interpret" : "multiple",
+            "accepted" : [
+                "Benign", "Likely Benign", "Uncertain Significance", "Likely Pathogenic", "Pathogenic",
+                "Conflicting interpretations of pathogenicity", "Drug Response", "Risk Factor", 
+                "association", "protective"
+            ],
+            "ignored" : [
+                "", "not provided", "other", "affects", "NA"
+            ]
+        },
+        {
+            "key" : "Ensembl Regulatory Feature",
+            "interpret" : "multiple",
+            "accepted" : [
+                "Promoter", "Promoter flanking region", "CTCF binding site", "Open chromatin", "Enhancer",
+                "TF binding site"
+            ],
+            "ignored" : [
+                "NA"
+            ]
+        },
+        {
+            "key" : "variant_attribute",
+            "interpret" : "multiple",
+            "accepted" : [
+                "simple repeat", "low complexity region"
+            ],
+            "ignored" : [
+                "NA"
+            ]
+        }
+    ],
+    "genes" : [
+        {
+            "key" : "Essentiality",
+            "interpret" : "multiple",
+            "accepted" : [
+                "non-essential", "neutral", "essential"
+            ],
+            "ignored" : [
+                "NA"
+            ]
+        }
+    ],
+    "variantTranscripts" : [
+        {
+            "key" : "Meta Svm Prediction",
+            "interpret" : "multiple",
+            "accepted" : [
+                "T", "D"
+            ],
+            "ignored" : [
+                "NA"
+            ]
+        },
+        {
+            "key" : "PolyPhen HV Prediction",
+            "interpret" : "multiple",
+            "accepted" : [
+                "B", "D", "P"
+            ],
+            "ignored" : [
+                "NA"
+            ]
+        },
+        {
+            "key" : "PolyPhen HD Prediction",
+            "interpret" : "multiple",
+            "accepted" : [
+                "B", "D", "P"
+            ],
+            "ignored" : [
+                "NA"
+            ]
+        },
+        {
+            "key" : "Provean Prediction",
+            "interpret" : "multiple",
+            "accepted" : [
+                "D", "N"
+            ],
+            "ignored" : [
+                "NA"
+            ]
+        },
+        {
+            "key" : "SIFT Prediction",
+            "interpret" : "multiple",
+            "accepted" : [
+                "D", "T"
+            ],
+            "ignored" : [
+                "NA"
+            ]
+        },
+        {
+            "key" : "Effects",
+            "interpret" : "multiple",
+            "accepted" : [
+                "Non-synonymous", "Possible splicing modifier", "Splice site alteration", "Premature stop",
+                "Synonymous", "AA duplication", "Possible frameshift", "Near splice site alteration", 
+                "Possible start site alteration", "AA deletion", "AA insertion", "Possible promoter disruption",
+                "Stop codon read through", "AA indel", "Whole Exon Deletion"
+            ],
+            "ignored" : [
+                "unknown"
+            ]
+        },
+        {
+            "key" : "Affected Regions",
+            "interpret" : "multiple",
+            "accepted" : [
+                "Interior coding exon", "exonic side canonical 5' splice site", "5' non-coding exon", "non-coding exon",
+                "interior intron", "canonical 5' splice site", "5' utr intron", "5' coding exon", "3' non-coding exon",
+                "canonical 3' splice site", "non-canonical 3' splice site", "non-canonical 5' splice site", 
+                "exonic side canonical 3' splice site", "3' coding exon", "intron", "3' utr intron", "Error in Reference Sequence"
+            ],
+            "ignored" : [
+                "N/A"
+            ]
+        }
+    ]
+}
