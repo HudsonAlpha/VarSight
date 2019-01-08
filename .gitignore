@@ -1,5 +1,14 @@
 .DS_Store
+CODI_metadata/3Jan2019_UDN_Variants_all.csv
+CODI_metadata/all.txt
+CODI_metadata/auth.json
+CODI_metadata/missing.txt
+CODI_metadata/sample_info_dump_v3.csv
+CODI_metadata/v6_clinical_filter_with_disease.json
 scripts/__pycache__
+scripts/DownloadCodiResults.py
+scripts/FindCompletedSamples.py
+scripts/PrepSampleData.sh
 paper/*.sty
 paper/*.bst
 pyxis_ranks_*
@@ -11,4 +20,11 @@ paper/crop.cfg
 paper/main.aux
 paper/main.log
 paper/main.synctex.gz
+paper/data_rendered.tex
+paper/document.bib
+paper/main.bbl
+paper/main.pdf
+
+CLI_primary_V6*
+data
 
