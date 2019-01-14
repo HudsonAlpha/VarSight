@@ -1,0 +1,10 @@
+Feature label
+{% for clf_label in FEATURE_CLASSIFIERS %}
+    &{{ clf_label }}
+{% endfor %}
+\\ \hline
+{% for tup in TABLE %}
+    {{ tup[0] }}&{{ '%0.4f' % tup[1] }}&{{ '%0.4f' % tup[2] }} \\
+{% endfor %}
+\hline
+Total (features with avg. $\ge0.02$)&{{ '%0.4f' % TABLE_SUM[0] }}&{{ '%0.4f' % TABLE_SUM[1] }} \\

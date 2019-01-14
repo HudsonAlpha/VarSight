@@ -11,6 +11,7 @@ import os
 import re
 
 import CodiDumpUtil
+import ExomiserUtil
 import HPOUtil
 import OntologyUtil
 import PyxisMapUtil
@@ -193,7 +194,8 @@ def loadFormattedData():
         ("percent reads", -1.0),
         ("total depth", -1.0)
     ]
-    seqFieldsOnly = set([l for l, d in seqValues])
+    
+    seqFieldsOnly = set([l for l, d in seqValues]) | set(['chromosome', 'position', 'ref allele', 'alt allele'])
     
     #numerical variant-transcript information
     #"ADA Boost Splice Prediction" - looks like 0-1 with "NA" in there; TODO: what is good/bad?
@@ -253,6 +255,8 @@ def loadFormattedData():
     #this will track the breaks between cases
     startIndices = [0]
 
+    exomiserRanks = []
+
     for sl in sorted(caseData.keys()):
         #we only need to load those which actually have a return
         if len(caseData[sl]['primaries']) == 0:
@@ -311,6 +315,7 @@ def loadFormattedData():
         
         #print('Primary set: ', primarySet)
         foundPrimaries = set([])
+        fpCPRA = []
         
         #go through each variant now and format the inputs to be seen by a classifier
         for variant in codiDump:
@@ -322,6 +327,9 @@ def loadFormattedData():
             isPrimary = (1.0 if (vName in primarySet) else 0.0)
             if isPrimary:
                 foundPrimaries.add(vName)
+                
+                #fpCPRA is the same order as the repDicts (needed for later)
+                fpCPRA.append((str(variant['chromosome']), str(variant['position']), variant['ref allele'], variant['alt allele']))
                 repDicts.append(primaryDict[vName])
             else:
                 repDicts.append(None)
@@ -430,6 +438,11 @@ def loadFormattedData():
                 allCatBreak[k] += catBreak[k]
             allClassifications.append(classifications)
             allRepDicts += repDicts
+
+            #if we are using this case, load info from exomiser for comparison later
+            exRanks = ExomiserUtil.getTargetRanks(sl, fpCPRA)
+            exomiserRanks.append(exRanks)
+
         else:
             print(sl, 'ALL_MISSING', primarySet, foundPrimaries, sep=',')
         
@@ -441,7 +454,7 @@ def loadFormattedData():
     PCA_BREAK_MODE = 2 #each category has its own PCA, only X PCA components are allowed per category
     currentCatMode = PCA_BREAK_MODE
 
-    featureLabels = (['PyxisMap', 'HPOUtil']+
+    featureLabels = (['PyxisMap', 'HPO-cosine']+
         [l for l, d in floatValues]+
         [l for l, r, d in geneValues]+
         [l for l, d in seqValues]+
@@ -504,9 +517,9 @@ def loadFormattedData():
     #return the values
     yFinal = np.array(np.hstack(allClassifications), dtype='int64')
 
-    return (xFinal, yFinal, featureLabels, startIndices, allRepDicts)
+    return (xFinal, yFinal, featureLabels, startIndices, allRepDicts, exomiserRanks)
 
-def runClassifiers(args, values, classifications, featureLabels, startIndices, allRepDicts):
+def runClassifiers(args, values, classifications, featureLabels, startIndices, allRepDicts, exomiserRanks):
     '''
     @param args - any arguments from the command line argparse can be accessed here
     @param values - a matrix with R rows and C columns, where there are "C" features
@@ -514,9 +527,9 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
     @param featureLabels - C length array containing labels (strings) for the features
     @param startIndices - the startIndices of individual cases in the training set
     @param allRepDicts - a list of dictionaries for variants that were reported; non-reported vars are None
+    @param exomiserRanks - paired exomiser ranks for each case; needs to be split up with train/test
     @return resultsDict - a dictionary containing many results we wish to include in a paper
     '''
-    
     resultsDict = {}
     resultsDict['FEATURE_LABELS'] = featureLabels
     print('Values:', values.shape)
@@ -540,11 +553,13 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
         train_indices = [0]
         train_dicts = []
         tpTrain = 0
+        exomiserTrain = []
         testXArray = []
         testYArray = []
         test_indices = [0]
         test_dicts = []
         tpTest = 0
+        exomiserTest = []
         
         #ratio of TRAIN:TEST
         invRat = 1.0/TEST_SIZE - 1
@@ -560,6 +575,7 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
                 train_indices.append(train_indices[-1]+(et-st))
                 train_dicts += allRepDicts[st:et]
                 tpTrain += tpCount
+                exomiserTrain.append(exomiserRanks[x])
             else:
                 #we need more in our test
                 testXArray.append(values[st:et])
@@ -567,6 +583,7 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
                 test_indices.append(test_indices[-1]+(et-st))
                 test_dicts += allRepDicts[st:et]
                 tpTest += tpCount
+                exomiserTest.append(exomiserRanks[x])
         
         #join them all together
         train_x = np.vstack(trainXArray)
@@ -636,7 +653,7 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
             'n_estimators' : [10, 20, 30, 40, 50]
         })
     ]
-    
+
     #save the labels for use later
     resultsDict['CLF_LABELS'] = [l for l, r, h in classifiers]
 
@@ -684,9 +701,10 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
             if currentMode == EXACT_MODE:
                 resultsDict['CLASSIFIERS'][clf_label]['FEATURE_IMPORTANCE'] = clf.feature_importances_
             elif currentMode in [GRID_MODE, RANDOM_MODE]:
-                resultsDict['CLASSIFIERS'][clf_label]['FEATURE_IMPORTANCE'] = clf.base_estimator_.feature_importances_
+                resultsDict['CLASSIFIERS'][clf_label]['FEATURE_IMPORTANCE'] = clf.best_estimator_.feature_importances_
 
-        except:
+        except Exception as e:
+            #raise e
             pass
         
         #balanced accuracy - an accuracy score that is an average across the classes
@@ -759,12 +777,12 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
                 for i, v in enumerate(ordered):
                     if case_y[v] == 1:
                         pathLevel = pDict[case_d[v]['path_level']]
-                        ranks.append(i)
+                        ranks.append(i+1)
                         rp.append(pathLevel)
 
                         if (pathLevel not in rDict):
                             rDict[pathLevel] = []
-                        rDict[pathLevel].append(i)
+                        rDict[pathLevel].append(i+1)
             
             print('\tNum ranked:', len(ranks))
             print('\tRanks:', ranks)
@@ -820,7 +838,7 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
         print()
     
     #before making these curves, lets add in some controls for comparison
-    comparedScores = ['CADD Scaled', 'HPOUtil']
+    comparedScores = ['CADD Scaled', 'HPO-cosine']
     csRocs = []
     csAucs = []
     csPrs = []
@@ -834,7 +852,7 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
         dataColumn = test_x[:, dataIndex]
         
         #these have to be reversed because they are rank-based (i.e. smaller is better)
-        if csLabel in ['HPOUtil', 'PyxisMap']:
+        if csLabel in ['HPO-cosine', 'PyxisMap']:
             dataColumn = 1-dataColumn
 
         false_positive_rate, true_positive_rate, thresholds = roc_curve(test_y, dataColumn)
@@ -878,12 +896,12 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
                 for i, v in enumerate(ordered):
                     if case_y[v] == 1:
                         pathLevel = pDict[case_d[v]['path_level']]
-                        ranks.append(i)
+                        ranks.append(i+1)
                         rp.append(pathLevel)
 
                         if (pathLevel not in rDict):
                             rDict[pathLevel] = []
-                        rDict[pathLevel].append(i)
+                        rDict[pathLevel].append(i+1)
             print(csLabel+':')
             print('\tNum ranked:', len(ranks))
             print('\tRanks:', ranks)
@@ -901,9 +919,77 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
                 print('\t\tstdev:', np.std(rDict[pDict[v]]))
                 print('\t\tmedian:', np.median(rDict[pDict[v]]))
                 resultsDict['COMPARISON'][csLabel]['TEST_RANKINGS'][v] = rDict[pDict[v]]
+    
+    #now do exomiser stuff
+    resultsDict['EXOMISER'] = {}
+    if CASE_BASED_SPLIT:
+        ranks = []
+        i = 0
+        rp = []
+        pDict = {
+            'VARIANT_OF_UNCERTAIN_SIGNIFICANCE' : 3,
+            'LIKELY_PATHOGENIC' : 4,
+            'PATHOGENIC' : 5
+        }
+        pList = ['VARIANT_OF_UNCERTAIN_SIGNIFICANCE', 'LIKELY_PATHOGENIC', 'PATHOGENIC']
+        #pList = ['LIKELY_PATHOGENIC', 'PATHOGENIC']
+
+        rDict = {}
         
+        #now do the test sets as if they were individual cases
+        for x in range(0, len(test_indices)-1):
+            st = test_indices[x]
+            et = test_indices[x+1]
+
+            #dataColumn is sorted such that highest is biggest rank
+            case_d = test_dicts[st:et]
+
+            #make the ranks 1-based
+            ranks += [r+1 if r != None else None for r in exomiserTest[x]]
+
+            for d in case_d:
+                if d != None:
+                    pathLevel = pDict[d['path_level']]
+                    rp.append(pathLevel)
+                    
+                    if (pathLevel not in rDict):
+                        rDict[pathLevel] = []
+                    rDict[pathLevel].append(ranks[i])
+                    i += 1
+
+        missingCounts = ranks.count(None)
+        ranks = list(filter(lambda v: v != None, ranks))
+        
+        print('Exomiser:')
+        print('\tNum ranked:', len(ranks))
+        print('\tMissing:', missingCounts)
+        print('\tRanks:', ranks)
+        print('\tPatho:', rp)
+        print('\tmean:', np.mean(ranks))
+        print('\tstdev:', np.std(ranks))
+        print('\tmedian:', np.median(ranks))
+        resultsDict['EXOMISER']['MISSING'] = {}
+        resultsDict['EXOMISER']['MISSING']['OVERALL'] = missingCounts
+        resultsDict['EXOMISER']['FOUND'] = {}
+        resultsDict['EXOMISER']['FOUND']['OVERALL'] = len(ranks)
+        resultsDict['EXOMISER']['TEST_RANKINGS'] = {}
+        resultsDict['EXOMISER']['TEST_RANKINGS']['OVERALL'] = ranks
+
+        for v in pList:
+            missingCounts = rDict[pDict[v]].count(None)
+            rDict[pDict[v]] = list(filter(lambda v: v != None, rDict[pDict[v]]))
+            print('\t'+v)
+            print('\t\tMissing:', missingCounts)
+            print('\t\tRanks:', rDict[pDict[v]])
+            print('\t\tmean:', np.mean(rDict[pDict[v]]))
+            print('\t\tstdev:', np.std(rDict[pDict[v]]))
+            print('\t\tmedian:', np.median(rDict[pDict[v]]))
+            resultsDict['EXOMISER']['MISSING'][v] = missingCounts
+            resultsDict['EXOMISER']['FOUND'][v] = len(ranks)
+            resultsDict['EXOMISER']['TEST_RANKINGS'][v] = rDict[pDict[v]]
+
     #ROC curve
-    plotFN = '/Users/matt/githubProjects/VarSight/images/codi_rf_roc.png'
+    plotFN = '/Users/matt/githubProjects/VarSight/paper/codi_rf_roc.png'
     plt.figure()
     plt.plot([0, 1], [0, 1], 'k--')
     
@@ -915,7 +1001,7 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
 
     plt.xlabel('False positive rate')
     plt.ylabel('True positive rate')
-    plt.title('ROC curve - all data')
+    #plt.title('ROC curve')
     plt.legend(loc='best')
     plt.xlim(0, 1)
     plt.ylim(0, 1)
@@ -924,7 +1010,7 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
     plt.close()
     
     #precision recall curve
-    plotFN = '/Users/matt/githubProjects/VarSight/images/codi_rf_pr.png'
+    plotFN = '/Users/matt/githubProjects/VarSight/paper/codi_rf_pr.png'
     plt.figure()
     
     for i, (label2, raw_clf, raw_params) in enumerate(classifiers):
@@ -935,7 +1021,7 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
     
     plt.xlabel('Recall')
     plt.ylabel('Precision')
-    plt.title('PR curve - all data')
+    #plt.title('PR curve')
     plt.legend(loc='best')
     plt.xlim(0, 1)
     plt.ylim(0, 1)
@@ -964,11 +1050,91 @@ def generateLaTeXResult(d):
     from jinja2 import Environment, FileSystemLoader
     rootPath = '/Users/matt/githubProjects/VarSight/paper/'
     env = Environment(loader=FileSystemLoader(rootPath))
+    
+    #this is the main data template
     template = env.get_template('data_template.tex')
     rendered = template.render(d)
     fp = open(rootPath+'/data_rendered.tex', 'wt+')
     fp.write(rendered)
     fp.close()
+
+    #render the classifier only template
+    template = env.get_template('classifier_template.tex')
+    rendered = template.render(d)
+    fp = open(rootPath+'/classifier_rendered.tex', 'wt+')
+    fp.write(rendered)
+    fp.close()
+
+    #feature importance table - we need to parse our features
+    orderedFeatures = []
+    classWithFeat = ['RandomForest(sklearn)', 'BalancedRandomForest(imblearn)']
+    shortClassNames = ['RF(sklearn)', 'BRF(imblearn)']
+    CUTOFF_IMPORTANCE = 0.02
+    assert(len(classWithFeat) == len(shortClassNames))
+    for i, label in enumerate(d['FEATURE_LABELS']):
+        orderedFeatures.append(np.mean([d['CLASSIFIERS'][c]['FEATURE_IMPORTANCE'][i] for c in classWithFeat]))
+    
+    argSorted = np.argsort(orderedFeatures)[::-1]
+    featDict = {}
+    featDict['FEATURE_CLASSIFIERS'] = shortClassNames
+    featDict['TABLE'] = []
+    for v in argSorted:
+        if orderedFeatures[v] >= CUTOFF_IMPORTANCE:
+            #print(d['FEATURE_LABELS'][v], orderedFeatures[v], [d['CLASSIFIERS'][c]['FEATURE_IMPORTANCE'][v] for c in classWithFeat], sep='\t')
+            featDict['TABLE'].append([d['FEATURE_LABELS'][v]]+[d['CLASSIFIERS'][c]['FEATURE_IMPORTANCE'][v] for c in classWithFeat])
+    featDict['TABLE_SUM'] = [
+        np.sum([t[1] for t in featDict['TABLE']]),
+        np.sum([t[2] for t in featDict['TABLE']])
+    ]
+    template = env.get_template('features_template.tex')
+    rendered = template.render(featDict)
+    fp = open(rootPath+'/features_rendered.tex', 'wt+')
+    fp.write(rendered)
+    fp.close()
+
+def generateViolinPlots(d):
+    '''
+    This function takes the results and makes some ranked violion plots for us
+    TODO: doesn't seem particularly helpful right now, the plot doesn't visually stratify enough; anything we can do about that?
+    '''
+    #create a violin plot stacking all the types
+    plotFN = '/Users/matt/githubProjects/VarSight/paper/violin_ranks.png'
+    plt.figure()
+    
+    overall = []
+    vus = []
+    lp = []
+    p = []
+    for clf_label in d['CLF_LABELS']:
+        overall.append(d['CLASSIFIERS'][clf_label]['TEST_RANKINGS']['OVERALL'])
+        vus.append(d['CLASSIFIERS'][clf_label]['TEST_RANKINGS']['VARIANT_OF_UNCERTAIN_SIGNIFICANCE'])
+        lp.append(d['CLASSIFIERS'][clf_label]['TEST_RANKINGS']['LIKELY_PATHOGENIC'])
+        p.append(d['CLASSIFIERS'][clf_label]['TEST_RANKINGS']['PATHOGENIC'])
+    
+    for cs_label in d['CS_LABELS']:
+        overall.append(d['COMPARISON'][cs_label]['TEST_RANKINGS']['OVERALL'])
+        vus.append(d['COMPARISON'][cs_label]['TEST_RANKINGS']['VARIANT_OF_UNCERTAIN_SIGNIFICANCE'])
+        lp.append(d['COMPARISON'][cs_label]['TEST_RANKINGS']['LIKELY_PATHOGENIC'])
+        p.append(d['COMPARISON'][cs_label]['TEST_RANKINGS']['PATHOGENIC'])
+
+    #for i, (label2, raw_clf, raw_params) in enumerate(classifiers):
+    #    plt.plot(prs[i][0], prs[i][1], label=('%s (%0.4f)' % (label2, pr_aucs[i])))
+    
+    #for i, label2 in enumerate(comparedScores):
+    #    plt.plot(csPrs[i][0], csPrs[i][1], label=('%s (%0.4f)' % (label2, csPrAucs[i])))
+    
+    #plt.xlabel('Recall')
+    #plt.ylabel('Precision')
+    #plt.title('PR curve - all data')
+    plt.violinplot(overall)
+    #plt.violinplot(vus)
+    #plt.violinplot(lp)
+    #plt.violinplot(p)
+    #plt.legend(loc='best')
+    #plt.yscale('log')
+    plt.grid()
+    plt.savefig(plotFN)
+    plt.close()
 
 def runAnalysis(args):
     '''
@@ -978,8 +1144,8 @@ def runAnalysis(args):
     REGENERATE_DATA = args.regenerate
 
     if REGENERATE_DATA or not os.path.exists(resultJsonFN):
-        (xFinal, yFinal, featureLabels, startIndices, allRepDicts) = loadFormattedData()
-        resultsDict = runClassifiers(args, xFinal, yFinal, featureLabels, startIndices, allRepDicts)
+        (xFinal, yFinal, featureLabels, startIndices, allRepDicts, exomiserRanks) = loadFormattedData()
+        resultsDict = runClassifiers(args, xFinal, yFinal, featureLabels, startIndices, allRepDicts, exomiserRanks)
 
         fp = open(resultJsonFN, 'wt+')
         json.dump(resultsDict, fp, default=jsonDumpFix)
@@ -991,7 +1157,9 @@ def runAnalysis(args):
 
     print(json.dumps(resultsDict, indent=4, sort_keys=True))
     resultsDict['np'] = np
+    resultsDict['len'] = len
     generateLaTeXResult(resultsDict)
+    generateViolinPlots(resultsDict)
 
 if __name__ == '__main__':
     p = ap.ArgumentParser(description='script for running analysis for VarSight', formatter_class=ap.RawTextHelpFormatter)

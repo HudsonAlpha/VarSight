@@ -1,4 +1,6 @@
 \documentclass{bioinfo}
+\usepackage{caption}
+\usepackage{graphicx}
 \usepackage{multirow}
 \usepackage{hhline}
 \copyrightyear{2015} \pubyear{2015}
@@ -11,11 +13,11 @@
 
 \subtitle{Subject Section}
 
-\title[short Title]{This is a title}
-\author[Holt \textit{et~al}.]{James M. Holt\,$^{\text{\sfb 1,}*}$, Co-Author\,$^{\text{\sfb 2}}$ and Co-Author\,$^{\text{\sfb 2,}*}$}
-\address{$^{\text{\sf 1}}$Department, Institution, City, Post Code, Country and \\
-$^{\text{\sf 2}}$Department, Institution, City, Post Code,
-Country.}
+\title[VarSight: Prioritizing Clinically Reported Variants]{VarSight: Prioritizing Clinically Reported Variants with Binary Classification Algorithms}
+\author[Holt \textit{et~al}.]{James M. Holt\,$^{\text{\sfb 1,}*}$, Brandon Wilk\,$^{\text{\sfb 1}}$, Camille Birch\,$^{\text{\sfb 1}}$, Donna Brown\,$^{\text{\sfb 1}}$, Manavalan Gajapathy\,$^{\text{\sfb 1}}$, Alex Moss\,$^{\text{\sfb 1}}$, Nadiya Sosonkina\,$^{\text{\sfb 1}}$, Melissa Wilk\,$^{\text{\sfb 1}}$, Julie Anderson\,$^{\text{\sfb 1}}$, Jeremy Harris\,$^{\text{\sfb 1}}$, Jacob Kelly\,$^{\text{\sfb 1}}$, Fariba Shaterferdosian\,$^{\text{\sfb 1}}$, Angelina Uno-Antonison\,$^{\text{\sfb 1}}$, Arthur Weborg\,$^{\text{\sfb 1}}$, Undiagnosed Diseases Network and Elizabeth A. Worthey\,$^{\text{\sfb 1}}$}
+\address{$^{\text{\sf 1}}$Software Development and Informatics, HudsonAlpha Institute for Biotechnology, Huntsville, 35806, USA % and \\
+%$^{\text{\sf 2}}$Department, Institution, City, Post Code, Country.}
+}
 
 \corresp{$^\ast$To whom correspondence should be addressed.}
 
@@ -23,9 +25,9 @@ Country.}
 
 \editor{Associate Editor: XXXXXXX}
 
-\abstract{\textbf{Motivation:} TODO.\\
-\textbf{Results:} TODO. \\
-\textbf{Availability:} TODO. \\
+\abstract{\textbf{Motivation:} In genomic medicine for rare disease patients, the major goal is to identify one or more variants that cause disease.  Typically, this is done through filtering and then prioritization of variants for manual curation.  However, prioritization of variants in rare disease patients remains a challenging task due to the high degree of variability in phenotype presentation and molecular source of disease.  Thus, methods that can identify and/or prioritize variants to be clinically reported in the presence of such variability of critical importance.  \\
+\textbf{Results:} We tested the application of classification algorithms that ingest variant predictions along with phenotype information for predicting whether a variant will be ultimately clinically reported and returned to a patient.  To test the classifiers, we performed a retrospective study on variants that were clinically reported to patients in the Undiagnosed Diseases Network.  We measured the classifier against another variant prioritization algorithm along with two single-measure controls to show how the classifiers tend to outperform the other methods.  The tested classifiers had a median rank of 7.0-8.0 for all variants and 2.0-3.5 for variants reported as pathogenic.  \\
+\textbf{Availability:} The scripts used to generate results are available at \href{https://github.com/HudsonAlpha/VarSight}{https://github.com/HudsonAlpha/VarSight}. \\
 \textbf{Contact:} \href{jholt@hudsonalpha.org}{jholt@hudsonalpha.org}\\
 \textbf{Supplementary information:} Supplementary data are available at \textit{Bioinformatics}
 online.}
@@ -33,80 +35,130 @@ online.}
 \maketitle
 
 \section{Introduction}
+Genome and exome sequencing are both currently being used as molecular diagnostic tools for patients with rare, undiagnosed diseases \citep{ramoni2017} (TODO: XXX: CITE MORE, CSER maybe?).  Typically, these technologies are applied clinically following the workflows consisting of blood draw, sequencing, alignment, variant calling, variant annotation, variant filtering, and variant prioritization \citep{worthey2017, roy2018}.  Then, clinical analysts usually perform the more manual processes of inspecting and then clinically reporting variants based on the known set of patient phenotypes.
 
+In general, commonly used pipelines exist for the steps from sequencing through variant calling \citep{rehm2013, cornish2015}.  Despite differences in performance, most of these standards ingest the same information to create a list of variants from sequencing data.  In contrast, methods for variant annotation and/or variant filtering are quite diverse \citep{wang2010, hu2013, jager2014, desvignes2018}.  These methods use a wide range of input sources including but not limited to population allele frequencies \citep{lek2016}, conservation scores \citep{cooper2005, siepel2006, petrovski2013}, haploinsufficiency scores \citep{huang2010, steinberg2015}, deleteriousness scores \citep{steinberg2015, rentzsch2018}, transcript impact scores \citep{kumar2009, choi2012, adzhubei2013, dong2014, jian2014} , and previously associated disease annotation \citep{stenson2003, hamosh2005, landrum2015}.  Variant prioritization is also quite diverse with some methods relying on the variant annotations to order variants \citep{hu2013} and some relying on patient phenotype to order the variants \citep{kohler2009, yang2015, rao2018, wilk2018}.  There are also methods which combine both variant annotations and phenotype score to rank the variants \citep{singleton2014, zemojtel2014, smedley2015a}, a selection of which are benchmarked on the same simulated datasets in \cite{smedley2015b}.
 
-WGS is currently being used as a molecular diagnostic tool for rare disease; blood draw + phenotypes are provided to analysis centers and these go through a standard alignment/variant calling pipeline
+Given a prioritized list of variants, analysts manually inspect those variants and curate a list of variants to ultimately report to the ordering physician.  Unfortunately, manual curation is time consuming and exhausting.  An analyst must inspect each variant and the associated metadata while simultaneously maintaining a mental picture of the patient's phenotype, leading to what we colloquially refer to as ``variant fatigue".  This variant fatigue means that variants at the end of the prioritized list are often regarded with less scrutiny and/or a less accurate patient model than those near the beginning.  Additionally, if causative variants can be identified earlier due to a high rank, it's possible that the full filtered variant list can be short-circuited to reduce the time needed to analyze a case.  Finally, accurate prioritization is a step towards the ultimate goal of automatically identifying all variants that cause a patient's primary phenotypes.
 
-Because of size of data, variants are typically filtered down based on rare disease expectations; these variants are manually checked by two or more analysts and reported to clinical site
+One of the issues with previously published ranking methods is that they were primarily tested on simulated datasets with known, single-gene, pathogenic variants injected into real or simulated background genomic datasets.  Additionally, when phenotype terms were used, they tended to use all available phenotype terms paired with the simulated disease with a few noisy terms added or removed.
 
-Manual curation is tedious and prone to error due to variant fatigue; thus tools that further reduce manual time on a case are paramount
-
-%\enlargethispage{12pt}
+In this paper, we focus on real patient data from the multi-site collaboration of the Undiagnosed Diseases Network (UDN) \citep{ramoni2017}.  Patients accepted into the UDN are believed to have rare, undiagnosed diseases of genetic origin.  Because the UDN is not focused on a single particular disease, the patient population has a diverse range of phenotypes represented.  Additionally, the phenotypes associated to an individual patient can be quite noisy for a variety of reasons: multiple genetic diseases, phenotype collection differences, and/or unrelated non-genetic diseases (such as phenotypes caused by old age).  Finally, analysts have the discretion to send back variants with different levels of pathogenicity as specified by the ACMG guidelines \cite{richards2015}.  The summation of these real-world problems means that prioritizing variants is challenging due to noisy phenotype inputs and variation in the pathogenicity of clinically reported outputs.
 
 \section{Approach}
-In this paper, we tested the application of classification algorithms for predicting whether a given variant in a patient sample would be returned on a clinical report.  To do this, we used patient samples from the UDN \citep{ramoni2017} who received genome sequencing and received at least one variant on their clinical report.  We then extracted data directly from the annotation and filtering tool used by our case analysts in order to replicate their standard view of the patient.  Additionally, we extracted a list of phenotype terms provided by the clinical site to pair with each patient.  These phenotype terms were processed with two scoring systems to provide phenotype scores for each variant.  Finally, each variant was either labeled as ``returned" or ``not returned" depending on whether it was ultimately sent back to the clinical site.
+In this paper, we tested the application of classification algorithms for two purposes: 1) predicting whether a variant observed by an analyst would be clinically reported and 2) prioritizing all variants seen by clinical analysts.  In particular, we focused our analyses on real patients with a diverse collection of rare, undiagnosed diseases that were admitted to the Undiagnosed Diseases Network (UDN) \citep{ramoni2017}.  We limited our patients to those who received whole genome sequencing and received at least one primary variant (i.e. not secondary or incidental) on their clinical report.  We extracted data directly from the same annotation and filtering tool used by the analysts in order to replicate their data view of each variant in a patient.  Additionally, we incorporated phenotype information into the models using two scoring systems that are based on ranking genes by their association to a set of patient phenotypes.  Finally, each variant was either labeled as ``returned" or ``not returned" depending on whether it was ultimately reported back to the clinical site.
 
-Given the above variant information, we split the data into training and testing sets for measuring the performance of classifiers.  We tested four classifiers that are readily available in the sklearn (CITE:XXX) and imblearn (CITE:XXX) Python modules.  After tuning each classifier, we generated summaries of the performance of each measure from a boolean classification perspective and from an ordered variant ranking perspective.
+Given the above variant information, we split the data into training and testing sets for measuring the performance of classifiers to predict whether a variant would be clinically reported or not.  We tested four classifiers that are readily available in the {\it sklearn} \citep{pedregosa2011} and {\it imblearn} \citep{lemaitre2017} Python modules.  Each classifier calculated probabilities of a variant belong to the ``returned" class, allowing for both classification analysis and ranking of the variants by their calculated probabilities.  After tuning each classifier, we generated summaries of the performance of each method from both a binary classification perspective and a variant ranking perspective.  All of the scripts to train classifiers, test classifiers, and format results are contained in the VarSight repository.
 
 \begin{methods}
 \section{Methods}
+\subsection{Data sources}
+All samples were selected from the cohort of genome sequencing samples originally sequenced at HudsonAlpha Institute for Biotechnology (HAIB) Sequencing Center of the Undiagnosed Diseases Network (UDN) \citep{ramoni2017}.  In short, the UDN accepts patients with rare, undiagnosed diseases that are believed to have a genetic origin.  The UDN is not restricted to a particular disease, so there are a diverse set of diseases and phenotypes represented across the whole population.  The phenotypes annotated to a patient are also noisy compared to simulated datasets for a variety of reasons including: 1) some patients have multiple diseases, 2) phenotype collection is done at seven different clinical sites leading to slightly different standards of collection, and 3) some patients exhibit more or less phenotypes than are associated with the classic disease presentation.  For more details on the UDN, refer to \citealp{ramoni2017}.  
+
+DNA for these UDN patients was prepared from blood samples (with few exceptions) and sequenced via standard operation protocols for use as a Laboratory-Developed Test (LDT) in the HAIB CAP/CLIA lab.  The analyses presented in this paper are based on data that is or will be deposited in the dbGaP database under dbGaP accession phs001232.v1.p1 by the UDN.
+
+%dbGaP citing info: https://www.ncbi.nlm.nih.gov/books/NBK45306/
+%link to study for my sanity: https://www.ncbi.nlm.nih.gov/projects/gap/cgi-bin/study.cgi?study_id=phs001232.v1.p1&phv=278114&phd=7085&pha=&pht=6078&phvf=5&phdf=&phaf=&phtf=&dssp=1&consent=&temp=1
+
+\subsection{Alignment and variant calling}
+After sequencing, we followed GATK best practices \citep{depristo2011} to align to the hg19 reference with BWA-mem \citep{li2013}.  Aligned sequences we processed via GATK for base quality score recalibration, indel realignment, and duplicate removal.  Finally, SNV and indel variants were joint genotyped, again according to GATK best practices \citep{depristo2011}.  The end result of this pipeline is a Variant Call Format (VCF) file used in the following sections.
+
+\subsection{Variant annotation and filtering}
+After VCF generation, the clinical analysts followed various published recommendations (e.g. \citealp{worthey2017, roy2018}) to annotate and filter variants from proband samples.  For variant annotation and filtering, we used the same tool that our analysts used during their initial analyses.  The tool, Codicem \citep{envision2018}, loads patient variants from a VCF and annotates the variants with over fifty annotations that the analysts can use to interpret pathogenicity.  These annotations include: variant level annotations such as CADD \citep{rentzsch2018}, conservation scores \citep{cooper2005, siepel2006}, and population frequencies \citep{lek2016}; gene level annotations such as haploinsufficiency scores \citep{huang2010, steinberg2015}, intolerance scores \citep{petrovski2013}, and disease associations \citep{stenson2003, hamosh2005, landrum2015}; and transcript level annotations such as protein change scores \citep{kumar2009, choi2012, adzhubei2013, dong2014} and splice site impact scores \citep{jian2014}.  Additionally, if the variant has been previously curated in another patient through HGMD or ClinVar \citep{stenson2003, landrum2015}, those annotations are also made available to the analysts.
+
+Codicem also performs filtering for the analysts to reduce the number of variants that are viewed through a standard clinical analysis.  We used the latest version of their primary clinical filter to replicate the standard filtering process of the analysts.  In short, the filter requires the following for a variant to pass through the clinical filter: sufficient total read depth, sufficient alternate read depth, low population frequency, at least one predicted effect on a transcript, at least one gene-disease association, and to not be a known, common false-positive from sequencing.  For the specific details on the filter used, refer to TODO:XXX (I think the source code?).  In general, the filter reduces the number of variant from the order of millions to hundreds (anecdotally, roughly 200-400 variants per proband after filtering).
+
+\subsection{Phenotype annotation}
+The Codicem annotations are all agnostic of the patient phenotype.  As noted earlier, we expect these patient phenotypes to be noisy when compared to simulated datasets due to the variety and complexity of diseases and phenotypes tied to UDN patients.  In order to incorporate patient phenotype information, we used two distinct methods to rank genes based on the Human Phenotype Ontology (HPO) \citep{kohler2018}.  We then annotated each variant with the best scores from their corresponding gene(s).  
+
+The first method uses base annotations provided by the HPO to calculate a simple cosine score \citep{kohler2017} between the patient's phenotypes and each gene.  This method tends to be more conservative because it relies solely on curated annotations from the HPO.  The second method, a tool called PyxisMap \citep{wilk2018}, uses the same annotations from the HPO, but adds in automatically text-mined data from NCBI's PubTator \citep{wei2013} and performs a Random-Walk with Restart \citep{page1999} on the ontology graph structure.  The PyxisMap method has the added benefit of incorporating fresh gene-phenotype connections from newer papers, but it also tends to make more spurious connections due to the imprecision of the text-mining from PubTator.  Each method generates a single numerical feature that is used in the following analyses.
+
 \subsection{Patient selection}
-All samples were selected from the cohort of genome sequencing samples originally sequenced at HudsonAlpha Institute for Biotechnology (HAIB) Sequencing Center of the Undiagnosed Diseases Network \citep{ramoni2017}.  The DNA was prepared from blood samples (with few exceptions) and sequenced via standard operation protocols for use as a Laboratory-Developed Test (LDT) in the HAIB CAP/CLIA lab.  After sequencing, we followed GATK best practices \citep{depristo2011} to align to the hg19 reference with BWA-mem (CITE: XXX).  Aligned sequences we processed via GATK for base quality score recalibration, indel realignment, and duplicate removal.  Finally, SNV and indel variants were joint genotyped, again according to GATK best practices \citep{depristo2011}.  The end result of this pipeline is a Variant Call Format (VCF) file used in the following sections.
+In our analysis, we focused on variants that were clinically reported as ``primary", meaning the analysts believed the variant to be directly related to the patient's phenotype.  Note that secondary and/or incidental findings are specifically not included in this list.  The analysts assigned each primary variant a rank from variant of uncertain significance (VUS), likely pathogenic, or pathogenic based on the recommendations in the ACMG guidelines for variant classification \citep{richards2015}.  
 
-After VCF generation, clinical analysts followed various published recommendations (e.g. \citealp{worthey2017, roy2018}) to annotate and filter variants from proband samples.  
-%Specifically, we used a tool called CODICEM (CITE:XXX) to annotate, filter, and ultimately generate a report for each proband sample.  
-In our analysis, we focused on variants that were clinically reported as ``primary", meaning the analysts believe the variant to be directly related to the patient's phenotype.  Secondary or incidental variant findings were excluded for our analysis.  We required each sample included in our analysis to be a proband sample and to have at least one primary variant that was returned on the final clinical report.  At the time of writing, this amounted to XXX primary variants from a total of XXX proband samples.
-
-TODO: modify above to reflect the need for phenotips also
-
-\subsection{Variant annotation}
-For variant annotation, we used the tool CODICEM (CITE:XXX) that was developed at HudsonAlpha Institute for Biotechnology.  In short, the software loads patient variants from a VCF and annotates the variants with over fifty annotations that a case analyst can use to interpret a patient's variant.  These annotations include: variant level annotations such as CADD (CITE:XXX), conservation scores (CITE:XXX, phylop, phastcon, and GERP), and population frequencies (CITE:XXX gnomad); gene level annotations such as haploinsufficiency scores (CITE: XXX, HIS and GHIS), intolerance scores (CITE: XXX, RVIS), and disease associations (CITE: XXX, HGMD, ClinVar, OMIM); and transcript level annotations such as amino acid change scores (CITE: XXX, PolyPhen, SIFT, PROVEAN) and splice site impact scores (CITE: XXX, AdaBoost and RandomForest splice predictors).  Additionally, if the variant has been previously curated through HGMD or ClinVar (CITE: XXX), those annotations are also made available to the analysts.
-
-The above annotations are all agnostic of the patient phenotype.  In order to incorporate patient phenotype information, we used two methods to rank genes using the Human Phenotype Ontology (HPO) (CITE: XXX) terms provided by the clinical sites.  We then annotated each variant with the scores from their corresponding gene.  The first method uses base annotations provided by the HPO to calculate a simple cosine score (CITE: XXX) between the patient phenotype and each gene.  This method tends to be more conservative because it relies on curated annotations from the HPO.  The second method, a tool called PyxisMap, uses the same annotations from the HPO, but adds in automatically text-mined data from NCBI's PubTator (CITE: XXX) and performs a Random-Walk with Restart (CITE:XXX) on the HPO ontology.  This methods has the added benefit of incorporating fresh gene-phenotype connections from newer papers, but tends to be more error prone due to the imprecision of the text-mining.
+We required the following for each proband sample included in our analyses: 1) at least one clinically reported primary variant that came through the primary clinical filter (i.e. it was not found through some other targeted search) and 2) a set of phenotypes annotated using the Human Phenotype Ontology \citep{kohler2018}.  At the time of writing, this amounted to 378 primary, reported variants spanning a total of 237 proband samples.
 
 \subsection{Data cleaning}
-Numerical data is given a number with out-of-bounds defaults
+For the purposes of classification, all annotations needed to be cleaned and stored as numerical features.  For numerical annotations, we simply copied the annotation over as a single value feature.  Default values were assigned to missing annotations that were outside the expected value range.  Additionally, these values were always on the less impactful side of the spectrum (e.g. a default conservation score would err on the side of not being conserved).  The one exception to this rule was for variant allele frequencies where a variant absent from the database was considered to have an allele frequency of 0.0.
 
-Categorical data is XXX (what do we decide to do with it?)
+For categorical data, we used a two step approach to cleaning the data: bin-count encoding and principal component analysis.  First, we chose to use a bin-count because there are many categories where multiple categorical labels may be present at different quantities.  For example, a single ClinVar variant may have multiple entries where different sites have selected different levels of pathogenicity.  In this situation, we desired to capture not only the categorical label as a feature, but also the number of times that label occurred in the annotations.  Second, we found that the bin-count encoding tended to create many extra features (one per category per annotation type) that were ignored and/or diluted the useful features from the pool of features.  To reduce this dilution, we used principal component analysis \citep{jolliffe2011} to reduce the dimensions of each category and stored at most two features per categorical feature.  For specifics on variance explained by the top two PCA components per category, please see Supplementary document XXX (TODO: are we going to make this or no?)
 
 \subsection{Model training and tuning}
+As noted earlier, there are generally hundreds of variants per proband that make it through the filter, but only a few are ever clinically reported.  As a result, there is a major imbalance in the number of true positives (variants clinically reported) and true negatives (variants seen, but not clinically reported).  Across all 237 proband samples, there were a total of 378 clinically reported variants and another 87819 variants that were seen but not reported.  We split the data into training and test sets on a per-proband basis with the primary goal of roughly balancing the total number of true positives in each set.  Additionally, the cases were assigned to a particular set by chronological order of analysis in order to reduce any chronological biases that may be introduced by expanding scientific knowledge (i.e. there are roughly equal proportions of ``early" or ``late" proband samples from the UDN in each set).  In the training set, there were a total of 189 returned variants and 44593 not returned variants spanning 120 different probands.  In the test set, there were a total of 189 returned variants and 43226 not returned variants spanning 117 different probands.  In our results, the returned test variants are further stratified in their reported levels of pathogenicity.
 
-We tested a lot of models and tuned them
+We then selected four readily available models for classification that are capable of training on imbalanced datasets: a random forest model by {\it sklearn} \citep{pedregosa2011}, a logistic regression model by {\it sklearn}, a balanced random forest model by {\it imblearn} \citep{lemaitre2017}, and an ensemble classification model by {\it imblearn}.  For each model, we selected a list of hyperparameters to test and tested each possible combination of those hyperparameters.  For each model and set of hyperparameters, we performed 10-fold cross validation on the training variants and recorded the balanced accuracy scores (i.e. a weighted accuracy score where inputs are weighted by their inverse class frequency).  For each model type, we saved the hyperparameters and model with the best average balanced accuracy score.  These four tuned models were then tested against the unseen set of test proband cases.
 
 \end{methods}
 
 \section{Discussion}
-Results go here
+\subsection{Classifier Statistics}
+\begin{figure*}
+\centerline{
+\includegraphics[width=0.45\textwidth]{codi_rf_roc.png}
+\includegraphics[width=0.45\textwidth]{codi_rf_pr.png}
+}
+\caption{Receiver operator curves.  This figure shows the receiver operator curves for the test data for each single-measure statistic and for each trained classifier.  On the left, we show the false positive rate against the true positive rate.  On the right, we show the recall against the precision.  Area under the receiver-operator curve (AUROC) is reported beside each method in the legend.  In general, the two random forest methods and the EasyEnsembleClassifier perform very similarly.  LogisticRegression tends to perform slightly worse overall, but still better than either single-measure statistic.}
+\label{fig:roc}
+\end{figure*}
 
-\subsection{RENDERED DATA}
-\begin{table*}
+For each tuned model, we calculated the 10-fold cross validated balanced accuracy on the training set.  We then calculated the true positive rate (TPR), false positive rate (FPR), and area under the receiver operator curve (AUROC) based on the unseen test data.  The values for each model are shown in Table \ref{tab:classifier_results}.  Additionally, receiver operator curves for FPR v. TPR and recall v. precision were created for the four models.  We compared this to two single-measure statistics (CADD Scaled and HPO-cosine) in Figure \ref{fig:roc}.  
+
+From these metrics, the two random forest models and the EasyEnsembleClassifier seem to perform similarly whereas LogisticRegression performs slightly worse across the board.  All four classifiers have higher AUROC than either single-measure statistic.  However, these classifier all have relatively poor performance from a precision-recall perspective (best AUROC for precision-recall was only 0.2109).  This indicates that from a classification perspective, these models would identify a high number of false positives relative to the true positives unless a very conservative cutoff score was used.
+
+\begin{table}[!t]
+\processtable{Classifier performance statistics.  For each tuned classifier, we show performance measures commonly used for classifiers (from left to right): 10-fold cross validation balanced accuracy, true positive rate, false positive rate, and area under the receiver operator curve. In general, the two random forest methods and the EasyEnsembleClassifier perform very similarly whereas LogisticRegression seems to be slightly worse across all measures. \label{tab:classifier_results}}{
+\begin{tabular}{c|c|c|c|c}
+\hline
+\input{classifier_rendered.tex}
+\hline
+\end{tabular}}{}
+\end{table}
+
+\subsection{Ranking Statistics}
+\begin{table*}[!t]
 \centering
+\processtable{Ranking performance statistics.  This table shows the ranking performance statistics for all methods evaluated on our test set.  CADD Scaled and HPO-cosine are single value measures that were used as inputs to the classifiers we tested.  Exomiser is an external tool that only reported ranks for a subset of the filtered variants.  The bottom four rows are the tuned, binary classification methods tested in this paper.  The ``Case Rank" columns show the median and mean ranks for all variants along with the variants split into their reported pathogenicity (calculated using the ACMG guidelines).  The ``Percentage in Top X Variants" columns show the percentage of variants that were found in the top 1, 10, and 20 variants in a case after ranking by the corresponding method.  All values were generated using only the test data that was unseen during training. \label{tab:performance}}{
 \begin{tabular}{c|c|c|c|c||c|c|c|c}
+\hline
 \input{data_rendered.tex}
-\end{tabular}
+\hline
+\end{tabular}}{$^*$Unranked variants were conservatively assumed to be at the next best rank after those that were ranked.}
 \end{table*}
 
-more results go here
+In addition to the model performance statistics, we also quantified the performance of each classifier as a ranking system.  For each proband, we calculated the probability of each class (reported or not reported) for each variant and ordered them from highest to lowest probability of being reported.  We then calculated median and mean rank statistics for the reported variants.  Additionally, we quantified the percentage of variants that were ranked in the top 1, 10, and 20 variants in each case.  While the models were trained as a binary classification system, we broke down the results further to demonstrate differences between variants that were clinically reported as a variant of uncertain significance (VUS), likely pathogenic, and pathogenic.  
 
-\subsection{blah blah}
-Mathy stuff: Precision, recall, AUC, ROC, etc.
+For comparison, we selected to run Exomiser \citep{smedley2015a} because it performed comparatively well with all phenotypes even in the presence of noise (see benchmarking from \citealp{smedley2015b}).  We used followed the installation on their website to install Exomiser CLI v.11.0.0 along with version 1811 for hg19 data sources.  For each test case, we created a VCF file from the pre-filtered list of annotated variants created by Codicem and passed those VCFs along with the full list of patient HPO terms to Exomiser.  We then parsed the output JSON file created by Exomiser into a ranked order of variants.  Of note, Exomiser did not rank every variant that was present in the filtered VCF, typically ranking only 20-50 variants from the pre-filtered VCF.  For primary variants that were unranked by Exomiser, we conservatively assumed that the Exomiser ranked those variants as just outside the range of what was returned (e.g. if Exomiser ranked 15 variants, we assumed a missing variant was ranked 16th).
 
-Practical stuff: in a case, this pushed reported variants to rank X out of Y (or something like this)
+Finally, we added two control scores for comparison: CADD scaled and HPO-cosine.  These scores were inputs to each classifier, but also represent some common ways variants one might naively order variants after filtering (by predicted deleteriousness and by similarity to phenotype).  The results for the two control scores, Exomiser, and all four classifiers are shown in Table \ref{tab:performance}.
+
+In the overall data, all four classifiers outperform the single-measure statistics and Exomiser across the board, with the one exception being Exomiser's mean (this measure is likely heavily biased due to our conservative ranking of unranked variants, harsher penalties for unranked variants would drastically change this result).  As expected, all methods perform better as the returned pathogenicity increases with the EasyEnsembleClassifier ranking 36\% of pathogenic variants in the first position and 97\% of pathogenic variants in the top 20.  Of the methods tested, the trained EasyEnsembleClassifier performs best overall with the strongest comparative performance in the pathogenic category.
+
+\subsection{Random Forest Feature Importances}
+After training and testing each classifier, we wished to explore which features played the largest role in how the classifier functioned.  Both random forest models calculate a feature importance array after training that sum to 1.0.  By chance, we had exactly 50 parameters as input to our model, thus we would expect approximately 2\% weight to be assigned to each parameter by chance.  Table \ref{tab:features} shows each features with an average importance $\ge 0.02$ as reported by each classifier.
+
+Interestingly, the two strongest individual features by far were the phenotype-based measures (HPO-cosine and PyxisMap) making up $\sim$33-40\% of the feature importance.  These were followed by CADD Scaled ($\sim$7-10\%) and three conservation scores ($\sim$14\%).  GnomAD-related fields ($\sim$8\%), GERP rsScore ($\sim$2-3\%), and HGMD-related fields ($\sim$4\%) made up the rest of features with higher than expected importance.  These results would suggest that phenotype-based metrics, deleteriousness scores, and conservation scores are of very high importance for predicting if a variant will be clinically returned to a rare disease patient.
+
+\begin{table}[!t]
+\processtable{Random forest feature importances.  This table shows the top feature importances reported by the two random forest algorithms we tested.  We had exactly 50 features passed into the classifier algorithms, so we show all features with an average importance $\ge 0.02$ indicating a feature utilized more than we would expect by chance. \label{tab:features}}{
+\begin{tabular}{l|c|c}
+\hline
+\input{features_rendered.tex}
+\hline
+\end{tabular}}{}
+\end{table}
 
 \section{Conclusion}
+We assessed the application of binary classification algorithms for identifying variants that were ultimately reported on a clinical report.  We trained and tested these algorithms using real patient variants and phenotype terms from the standard clinical process used for the Undiagnosed Diseases Network (UDN).  From a classification perspective, we found that these methods tend to have low precision scores, meaning a high number of false positives were identified by each method.  However, when evaluated as a ranking system, all four methods out-performed single-measure ranking systems and Exomiser.  We consider the best classifier to be the EasyEnsembleClassifier from {\it imblearn} that had a median rank of 7.0 for all reported variants while ranking 73\% in the top 20 for the case.  For ``Pathogenic" variants, the median rank was 2.0 and 97\% of those variants were ranked in the top 20 for the case.  While not perfect, the ability for the algorithms to push reported variants to very early in the list is quite promising.
 
-We did a thing
+We expect these classification algorithms could be improved or refined in a variety of ways.  First, adding new features and/or removing unused features could lead to improvements in the algorithm.  The top two most important features were both phenotype related suggesting that a highly accurate phenotype scoring system would greatly benefit these algorithms.  Many features had a low importance, so pruning them may improve the overall results.  Additionally, some of the features represent data that is not freely available to the research community, so pruning or replacing those features with publicly accessible sources would likely influence the results.  Second, there may be a better classification algorithm for this type of data.  The four selected classifiers were all freely available methods intended to handle the large class imbalance in the training set, but other algorithms that aren't as readily available may improve the result.
+
+Ultimately, we believe the trained classifiers in VarSight are a significant step forward in handling real-world data for rare, undiagnosed disease patients.  Despite the variability in phenotype and allowance of variants of uncertain significance in reporting, the models trained in VarSight still ranked reported variants highly, especially variants labeled as ``Pathogenic".  Going forward, we expect the standard for variant ranking systems will behave similar to those in VarSight, fully integrating all available phenotype and variant annotations into one model.
 
 \section*{Acknowledgements}
-TODO
-
-Text Text Text Text Text Text  Text Text.  \citealp{Boffelli03} might want to know about  text
-text text text\vspace*{-12pt}
+We are grateful for the participation of patients and family members and all of their referring clinicians. We would like to acknowledge all of the teams within the UDN including the coordinating center and all of the clinical sites working hard to provide definitive diagnoses for UDN patients. We would also like to acknowledge the UDN WGS core headed by Dr. Shawn Levy.  
 
 \section*{Funding}
-TODO
-
-This work has been supported by the... Text Text  Text Text.\vspace*{-12pt}
+This work was supported in part by the Intramural Research Program of the National Human Genome Research Institute and the NIH Common Fund through the Office of Strategic Coordination and Office of the NIH Director. Research reported in this manuscript was supported by the NIH Common Fund through the Office of Strategic Coordination and Office of the NIH Director under award numbers U01HG007530, U01HG007674, U01HG007703, U01HG007709, U01HG007672, U01HG007690, U01HG007708, U01HG007942, U01HG007943, U54NS093793, and U01TR001395. The content is solely the responsibility of the authors and does not necessarily represent the official views of the NIH.
 
 %\bibliographystyle{natbib}
 %\bibliographystyle{achemnat}
@@ -121,19 +173,134 @@ This work has been supported by the... Text Text  Text Text.\vspace*{-12pt}
 
 \begin{thebibliography}{}
 
-%CODICEM? - http://envisiongenomics.com/codicem-analysis-platform/
+%PolyPhen
+\bibitem[Adzhubei {\it et~al}., 2013]{adzhubei2013} Adzhubei, Ivan, Daniel M. Jordan, and Shamil R. Sunyaev. "Predicting functional effect of human missense mutations using PolyPhen?2." {\it Current protocols in human genetics} 76.1 (2013): 7-20.
+
+%PROVEAN - variant-transcript prediction
+\bibitem[Choi, 2012]{choi2012} Choi, Yongwook. "A fast computation of pairwise sequence alignment scores between a protein and a set of single-locus variants of another protein." {\it Proceedings of the ACM Conference on Bioinformatics, Computational Biology and Biomedicine}. ACM, 2012.
+
+%GERP - conservation
+\bibitem[Cooper {\it et~al}., 2005]{cooper2005} Cooper, Gregory M., \textit{et al.} "Distribution and intensity of constraint in mammalian genomic sequence." {\it Genome research} 15.7 (2005): 901-913.
+
+%variant calling pipeline comparisons
+\bibitem[Cornish {\it et~al}., 2015]{cornish2015} Cornish, Adam, and Chittibabu Guda. "A comparison of variant calling pipelines using genome in a bottle as a reference." {\it BioMed research international 2015} (2015).
 
 %GATK best practices
 \bibitem[DePristo {\it et~al}., 2011]{depristo2011} DePristo, Mark A., \textit{et~al.} "A framework for variation discovery and genotyping using next-generation DNA sequencing data." {\it Nature genetics} 43.5 (2011): 491.
 
+%VarAFT - variant annotator
+\bibitem[Desvignes {\it et~al}., 2018]{desvignes2018} Desvignes, Jean-Pierre, \textit{et~al.} "VarAFT: a variant annotation and filtration system for human next generation sequencing data." {\it Nucleic acids research} (2018).
+
+%MetaSVM - variant-transcript annotation
+\bibitem[Dong {\it et~al}., 2014]{dong2014} Dong, Chengliang, \textit{et~al.} "Comparison and integration of deleteriousness prediction methods for nonsynonymous SNVs in whole exome sequencing studies." {\it Human molecular genetics} 24.8 (2014): 2125-2137.
+
+%Codicem citation?
+\bibitem[Envision, 2018]{envision2018} Envision Genomics. "Codicem Analysis Platform." {\it Envision Genomics}. URL: \href{http://envisiongenomics.com/codicem-analysis-platform/}{http://envisiongenomics.com/codicem-analysis-platform/}.
+
+%OMIM
+\bibitem[Hamosh {\it et~al}., 2005]{hamosh2005} Hamosh, Ada, \textit{et~al.} "Online Mendelian Inheritance in Man (OMIM), a knowledgebase of human genes and genetic disorders." {\it Nucleic acids research} 33.suppl$\_$1 (2005): D514-D517.
+
+%VAAST - variant annotation & prioritization
+\bibitem[Hu {\it et~al}., 2013]{hu2013} Hu, Hao, \textit{et~al.} "VAAST 2.0: improved variant classification and disease-gene identification using a conservation-controlled amino acid substitution matrix." {\it Genetic epidemiology} 37.6 (2013): 622-634.
+
+%HIS - haploinsufficiency 
+\bibitem[Huang {\it et~al}., 2010]{huang2010} Huang, Ni, \textit{et~al.} "Characterising and predicting haploinsufficiency in the human genome." {\it PLoS genetics} 6.10 (2010): e1001154.
+
+%JANNOVAR - variant annotator, mostly for transcripts
+\bibitem[Jäger {\it et~al}., 2014]{jager2014} Jäger, Marten, \textit{et~al.} "Jannovar: A Java Library for Exome Annotation." {\it Human mutation} 35.5 (2014): 548-555.
+
+%AdaBoost and RandomForest predictions
+\bibitem[Jian {\it et~al}., 2014]{jian2014} Jian, Xueqiu, Eric Boerwinkle, and Xiaoming Liu. "In silico prediction of splice-altering single nucleotide variants in the human genome." {\it Nucleic acids research} 42.22 (2014): 13534-13544.
+
+%highly cite PCA from book
+\bibitem[Jolliffe, 2011]{jolliffe2011} Jolliffe, Ian. "Principal component analysis." {\it International encyclopedia of statistical science}. Springer, Berlin, Heidelberg, 2011. 1094-1096.
+
+%phenomizer - phenotype ranker
+\bibitem[Köhler {\it et~al}., 2009]{kohler2009} Köhler, Sebastian, \textit{et~al.} "Clinical diagnostics in human genetics with semantic similarity searches in ontologies." {\it The American Journal of Human Genetics} 85.4 (2009): 457-464.
+
+%cosine & jaccard scores
+\bibitem[Köhler, 2017]{kohler2017} Koehler, Sebastian. "Ontology-based similarity calculations with an improved annotation model." {\it bioRxiv} (2017): 199554.
+
+%HPO paper to cite
+\bibitem[Köhler {\it et~al}., 2018]]{kohler2018} Köhler, Sebastian, \textit{et~al.} "Expansion of the Human Phenotype Ontology (HPO) knowledge base and resources." {\it Nucleic acids research} (2018).
+
+%SIFT - variant-transcript prediction
+\bibitem[Kumar {\it et~al}., 2009]{kumar2009} Kumar, Prateek, Steven Henikoff, and Pauline C. Ng. "Predicting the effects of coding non-synonymous variants on protein function using the SIFT algorithm." {\it Nature protocols} 4.7 (2009): 1073.
+
+%ClinVar - latest pub.
+\bibitem[Landrum {\it et~al}., 2015]{landrum2015} Landrum, Melissa J., \textit{et~al.} "ClinVar: public archive of interpretations of clinically relevant variants." {\it Nucleic acids research} 44.D1 (2015): D862-D868.
+
+%ExAC & gnomad paper to cite
+\bibitem[Lek {\it et~al}., 2016]{lek2016} Lek, Monkol, \textit{et~al.} "Analysis of protein-coding genetic variation in 60,706 humans." {\it Nature} 536.7616 (2016): 285.
+
+%imblearn
+\bibitem[Lemaître {\it et~al}., 2017]{lemaitre2017} Lemaître, Guillaume, Fernando Nogueira, and Christos K. Aridas. "Imbalanced-learn: A python toolbox to tackle the curse of imbalanced datasets in machine learning." {\it The Journal of Machine Learning Research} 18.1 (2017): 559-563.
+
+%BWA-MEM
+\bibitem[Li, 2013]{li2013} Li, Heng. "Aligning sequence reads, clone sequences and assembly contigs with BWA-MEM." {\it arXiv} preprint arXiv:1303.3997 (2013).
+
+%RWR algorithm
+\bibitem[Page {\it et~al}., 1999]{page1999} Page, Lawrence, \textit{et~al.} "The PageRank citation ranking: Bringing order to the web." {\it Stanford InfoLab}, 1999.
+
+%sklearn
+\bibitem[Pedregosa {\it et~al}., 2011]{pedregosa2011} Pedregosa, Fabian, \textit{et~al.} "Scikit-learn: Machine learning in Python." {\it Journal of machine learning research} 12.Oct (2011): 2825-2830.
+
+%RVIS - intolerance score
+\bibitem[Petrovski {\it et~al}., 2013]{petrovski2013} Petrovski, Slavé, \textit{et~al.} "Genic intolerance to functional variation and the interpretation of personal genomes." {\it PLoS genetics} 9.8 (2013): e1003709.
+
 %UDN paper
 \bibitem[Ramoni {\it et~al}., 2017]{ramoni2017} Ramoni, Rachel B. \textit{et~al.} "The undiagnosed diseases network: accelerating discovery about health and disease." {\it The American Journal of Human Genetics} 100.2 (2017): 185-192.
+
+%phenotype based prioritization
+\bibitem[Rao {\it et~al}., 2018]{rao2018} Rao, Aditya, \textit{et~al.} "Phenotype-driven gene prioritization for rare diseases using graph convolution on heterogeneous networks." {\it BMC medical genomics} 11.1 (2018): 57.
+
+%ACMG clinical standards paper
+\bibitem[Rehm {\it et~al}., 2013]{rehm2013} Rehm, Heidi L., \textit{et~al.} "ACMG clinical laboratory standards for next-generation sequencing." {\it Genetics in medicine} 15.9 (2013): 733.
+
+%latest CADD paper
+\bibitem[Rentzsch {\it et~al}., 2018]{rentzsch2018} Rentzsch, Philipp, \textit{et~al.} "CADD: predicting the deleteriousness of variants throughout the human genome." {\it Nucleic acids research} (2018).
+
+%ACMG guidelines
+\bibitem[Richards {\it et~al}., 2015]{richards2015} Richards, Sue, \textit{et~al.} "Standards and guidelines for the interpretation of sequence variants: a joint consensus recommendation of the American College of Medical Genetics and Genomics and the Association for Molecular Pathology." {\it Genetics in medicine} 17.5 (2015): 405.
 
 %
 \bibitem[Roy {\it et~al}., 2018]{roy2018} Roy, Somak, \textit{et~al.} "Standards and guidelines for validating next-generation sequencing bioinformatics pipelines: a joint recommendation of the Association for Molecular Pathology and the College of American Pathologists." {\it The Journal of Molecular Diagnostics} 20.1 (2018): 4-27.
 
+%PhastCons and PhyloP - conservation scores
+\bibitem[Siepel {\it et~al}., 2006]{siepel2006} Siepel, Adam, Katherine S. Pollard, and David Haussler. "New methods for detecting lineage-specific selection." {\it Annual International Conference on Research in Computational Molecular Biology}. Springer, Berlin, Heidelberg, 2006.
+
+%Phevor - variant & phenotype ranker; removed reference in favor of review paper
+\bibitem[Singleton {\it et~al}., 2014]{singleton2014} Singleton, Marc V., \textit{et~al.} "Phevor combines multiple biomedical ontologies for accurate identification of disease-causing alleles in single individuals and small nuclear families." {\it The American Journal of Human Genetics} 94.4 (2014): 599-610.
+
+%Exomiser - phenotype & variant ranker; removed reference in favor of review paper
+\bibitem[Smedley {\it et~al}., 2015a]{smedley2015a}Smedley, Damian, \textit{et~al.} "Next-generation diagnostics and disease-gene discovery with the Exomiser." {\it Nature protocols} 10.12 (2015): 2004.
+
+%review of phenotype & variant rankers
+\bibitem[Smedley {\it et~al}., 2015b]{smedley2015b} Smedley, Damian, and Peter N. Robinson. "Phenotype-driven strategies for exome prioritization of human Mendelian disease genes." {\it Genome medicine} 7.1 (2015): 81.
+
+%GHIS - haploinsuff. scores
+\bibitem[Steinberg {\it et~al}., 2015]{steinberg2015} Steinberg, Julia, \textit{et~al.} "Haploinsufficiency predictions without study bias." {\it Nucleic acids research} 43.15 (2015): e101-e101.
+
+%HGMD - 2003, this is what they ask to cite though
+\bibitem[Stenson {\it et~al}., 2003]{stenson2003} Stenson, Peter D., \textit{et~al.} "Human gene mutation database (HGMD®): 2003 update." {\it Human mutation} 21.6 (2003): 577-581.
+
+%ANNOVAR - variant annotation
+\bibitem[Wang {\it et~al}., 2010]{wang2010} Wang, Kai, Mingyao Li, and Hakon Hakonarson. "ANNOVAR: functional annotation of genetic variants from high-throughput sequencing data." {\it Nucleic acids research} 38.16 (2010): e164-e164.
+
+%PubTator
+\bibitem[Wei {\it et~al}., 2013]]{wei2013} Wei, Chih-Hsuan, Hung-Yu Kao, and Zhiyong Lu. "PubTator: a web-based text mining tool for assisting biocuration." {\it Nucleic acids research} 41.W1 (2013): W518-W522.
+
+%PyxisMap
+\bibitem[Wilk {\it et~al}., 2018]{wilk2018} Wilk, Brandon, James M. Holt, and Elizabeth A. Worthey. "PyxisMap." {\it HudsonAlpha Institute for Biotechnology.}  URL: \href{https://github.com/HudsonAlpha/LayeredGraph}{https://github.com/HudsonAlpha/LayeredGraph}.
+
 %Worthey WGS pipeline
 \bibitem[Worthey, 2017]{worthey2017} Worthey, Elizabeth A. "Analysis and Annotation of Whole-Genome or Whole-Exome Sequencing Derived Variants for Clinical Diagnosis." {\it Current protocols in human genetics} 95.1 (2017): 9-24.
+
+%Phenolyzer - phenotype based ranking
+\bibitem[Yang {\it et~al}., 2015]{yang2015} Yang, Hui, Peter N. Robinson, and Kai Wang. "Phenolyzer: phenotype-based prioritization of candidate genes for human diseases." {\it Nature methods} 12.9 (2015): 841.
+
+%PhenIX
+\bibitem[Zemojtel {\it et~al}., 2014]{zemojtel2014} Zemojtel, Tomasz, \textit{et~al.} "Effective diagnosis of genetic disease by computational phenotype analysis of the disease-associated genome." {\it Science translational medicine} 6.252 (2014): 252ra123-252ra123.
 
 \end{thebibliography}
 \end{document}
