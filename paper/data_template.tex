@@ -7,10 +7,10 @@ VUS (n={{ TEST_COUNTS.VARIANT_OF_UNCERTAIN_SIGNIFICANCE }})&
 LP (n={{ TEST_COUNTS.LIKELY_PATHOGENIC }})&Path. (n={{ TEST_COUNTS.PATHOGENIC }}) \\ \hhline{=|=|=|=|=||=|=|=|=}
 {% for cs_label in CS_LABELS %}
     {{ cs_label }}&
-    {% for LEVEL in ['OVERALL', 'VARIANT_OF_UNCERTAIN_SIGNIFICANCE', 'LIKELY_PATHOGENIC', 'PATHOGENIC'] %}
+    {% for LEVEL in LEVELS %}
         {{ '%0.1f (%0.2f)' % (np.median(COMPARISON[cs_label].TEST_RANKINGS[LEVEL]), np.mean(COMPARISON[cs_label].TEST_RANKINGS[LEVEL])) }}&
     {% endfor %}
-    {% for LEVEL in ['OVERALL', 'VARIANT_OF_UNCERTAIN_SIGNIFICANCE', 'LIKELY_PATHOGENIC', 'PATHOGENIC'] %}
+    {% for LEVEL in LEVELS %}
         {{ '%d, %d, %d' % 
             (100.0*np.sum(np.array(COMPARISON[cs_label].TEST_RANKINGS[LEVEL]) <= 1) / len(COMPARISON[cs_label].TEST_RANKINGS[LEVEL]),
             100.0*np.sum(np.array(COMPARISON[cs_label].TEST_RANKINGS[LEVEL]) <= 10) / len(COMPARISON[cs_label].TEST_RANKINGS[LEVEL]),
@@ -25,10 +25,10 @@ LP (n={{ TEST_COUNTS.LIKELY_PATHOGENIC }})&Path. (n={{ TEST_COUNTS.PATHOGENIC }}
 \hhline{=|=|=|=|=||=|=|=|=}
 
 Exomiser$^*$&
-{% for LEVEL in ['OVERALL', 'VARIANT_OF_UNCERTAIN_SIGNIFICANCE', 'LIKELY_PATHOGENIC', 'PATHOGENIC'] %}
+{% for LEVEL in LEVELS %}
     {{ '%0.1f (%0.2f)' % (np.median(EXOMISER.TEST_RANKINGS[LEVEL]), np.mean(EXOMISER.TEST_RANKINGS[LEVEL])) }}&
 {% endfor %}
-{% for LEVEL in ['OVERALL', 'VARIANT_OF_UNCERTAIN_SIGNIFICANCE', 'LIKELY_PATHOGENIC', 'PATHOGENIC'] %}
+{% for LEVEL in LEVELS %}
     {{ '%d, %d, %d' % 
         (100.0*np.sum(np.array(EXOMISER.TEST_RANKINGS[LEVEL]) <= 1) / len(EXOMISER.TEST_RANKINGS[LEVEL]),
         100.0*np.sum(np.array(EXOMISER.TEST_RANKINGS[LEVEL]) <= 10) / len(EXOMISER.TEST_RANKINGS[LEVEL]),
@@ -42,10 +42,10 @@ Exomiser$^*$&
 
 {% for clf_label in CLF_LABELS %}
     {{ clf_label }}&
-    {% for LEVEL in ['OVERALL', 'VARIANT_OF_UNCERTAIN_SIGNIFICANCE', 'LIKELY_PATHOGENIC', 'PATHOGENIC'] %}
+    {% for LEVEL in LEVELS %}
         {{ '%0.1f (%0.2f)' % (np.median(CLASSIFIERS[clf_label].TEST_RANKINGS[LEVEL]), np.mean(CLASSIFIERS[clf_label].TEST_RANKINGS[LEVEL])) }}&
     {% endfor %}
-    {% for LEVEL in ['OVERALL', 'VARIANT_OF_UNCERTAIN_SIGNIFICANCE', 'LIKELY_PATHOGENIC', 'PATHOGENIC'] %}
+    {% for LEVEL in LEVELS %}
         {{ '%d, %d, %d' % 
             (100.0*np.sum(np.array(CLASSIFIERS[clf_label].TEST_RANKINGS[LEVEL]) <= 1) / len(CLASSIFIERS[clf_label].TEST_RANKINGS[LEVEL]),
             100.0*np.sum(np.array(CLASSIFIERS[clf_label].TEST_RANKINGS[LEVEL]) <= 10) / len(CLASSIFIERS[clf_label].TEST_RANKINGS[LEVEL]),
