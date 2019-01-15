@@ -5,9 +5,10 @@ This file should contain helper functions to load the UDN summary DB information
 import csv
 import openpyxl
 
-def loadSummaryDatabase(altIDMap):
+def loadSummaryDatabase(altIDMap, path_only):
     '''
     @param altIDMap - an alternate ID map for the HPO terms; dict of HPO term and the term to replace it with
+    @param path_only - if True, only load pathogenic and likely pathogenic variants as true positive
     @return - a JSON dictionary with the following structure:
     {
         "SL##" : {
@@ -91,7 +92,11 @@ def loadSummaryDatabase(altIDMap):
     fpcsv = open('/Users/matt/githubProjects/VarSight/CODI_metadata/3Jan2019_UDN_Variants_all.csv', 'rt')
     primarySheet = csv.DictReader(fpcsv)
     revOrderPath = ['PATHOGENIC', 'LIKELY_PATHOGENIC', 'VARIANT_OF_UNCERTAIN_SIGNIFICANCE', 'BENIGN']
-    ALLOWED_PATHOGENICITY = set(revOrderPath[0:3])
+    if path_only:
+        ALLOWED_PATHOGENICITY = set(revOrderPath[0:2])
+    else:
+        ALLOWED_PATHOGENICITY = set(revOrderPath[0:3])
+        
     for row in primarySheet:
         slid = row['Sample']
         genes = row['Gene']

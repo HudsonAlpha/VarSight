@@ -116,9 +116,10 @@ def getPyxisMapResults():
                 else:
                     print('Failed to retrieve results for '+sl+' from HPOUtil')
 
-def loadFormattedData():
+def loadFormattedData(args):
     '''
     This function is primarily about loading and formatting data prior to training/testing any classifiers.
+    @param args - arguments from the command line
     @return - tuple (xFinal, yFinal, featureLabels, startIndices, allRepDicts)
         xFinal - an NxM matrix where N is the number of variants in our test/training set and M is the number of features; contains feature values
         yFinal - an N length array where N is the number of variants in our test/training set; 1 if the variant was reported
@@ -242,8 +243,8 @@ def loadFormattedData():
     ontFN = '/Users/matt/githubProjects/LayeredGraph/HPO_graph_data/hp.obo'
     nodes, edges, parents, altIDMap = OntologyUtil.loadGraphStructure(ontFN)
     
-    #1 - load the summary database
-    caseData = SummaryDBUtil.loadSummaryDatabase(altIDMap)
+    #1 - load the summary database 
+    caseData = SummaryDBUtil.loadSummaryDatabase(altIDMap, args.path_only)
     
     #2 - load each CODI dump that HAS a result from the summary database and reformat the data
     allValues = []
@@ -544,6 +545,17 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
     CASE_BASED_SPLIT = True
     TEST_SIZE = 0.5
 
+    pDict = {
+        'VARIANT_OF_UNCERTAIN_SIGNIFICANCE' : 3,
+        'LIKELY_PATHOGENIC' : 4,
+        'PATHOGENIC' : 5
+    }
+    if args.path_only:
+        pList = ['LIKELY_PATHOGENIC', 'PATHOGENIC']
+    else:
+        pList = ['VARIANT_OF_UNCERTAIN_SIGNIFICANCE', 'LIKELY_PATHOGENIC', 'PATHOGENIC']
+    
+
     if CASE_BASED_SPLIT:
         #we decided to split the train/test by case, going to need some custom stuff here
         #we want to make sure ~25% of the true positives are in the test set and the remaining in the training set
@@ -751,14 +763,7 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
         if CASE_BASED_SPLIT:
             ranks = []
             rp = []
-            pDict = {
-                'VARIANT_OF_UNCERTAIN_SIGNIFICANCE' : 3,
-                'LIKELY_PATHOGENIC' : 4,
-                'PATHOGENIC' : 5
-            }
-            pList = ['VARIANT_OF_UNCERTAIN_SIGNIFICANCE', 'LIKELY_PATHOGENIC', 'PATHOGENIC']
-            #pList = ['LIKELY_PATHOGENIC', 'PATHOGENIC']
-
+            
             rDict = {}
             
             #now do the test sets as if they were individual cases
@@ -817,11 +822,23 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
             print("\tbal_Accuracy: %0.4f (+/- %0.4f)" % (bal_cvs_scores.mean(), bal_cvs_scores.std() * 2))
             resultsDict['CLASSIFIERS'][clf_label]['CV10_BALANCED_ACCURACY'] = (bal_cvs_scores.mean(), bal_cvs_scores.std() * 2)
             
+            #TODO: I think we should be using F1 here, only matters if we ever go back to EXACT_MODE for reporting results
             #f1_weighted - see https://scikit-learn.org/stable/modules/generated/sklearn.metrics.f1_score.html#sklearn.metrics.f1_score
             f1w_cvs_scores = cross_val_score(clf, train_x, train_y, cv=cv, scoring='f1_weighted')
             print('\tf1w_cvs_scores', f1w_cvs_scores)
             print("\tf1w_Accuracy: %0.4f (+/- %0.4f)" % (f1w_cvs_scores.mean(), f1w_cvs_scores.std() * 2))
             resultsDict['CLASSIFIERS'][clf_label]['CV10_BALANCED_F1_WEIGHTED'] = (f1w_cvs_scores.mean(), f1w_cvs_scores.std() * 2)
+            
+            '''
+            #Might be worth doing this in the future, but not particularly useful right now due to data redundancy
+            import eli5
+            from eli5.sklearn.permutation_importance import PermutationImportance
+            permImp = PermutationImportance(clf, scoring='balanced_accuracy', random_state=0, cv='prefit')
+            permImp.fit(train_x, train_y)
+            explan = eli5.explain_weights(permImp, feature_names=featureLabels)
+            print(eli5.formatters.text.format_as_text(explan))
+            exit()
+            '''
 
         elif currentMode in [GRID_MODE, RANDOM_MODE]:
             #CV is already calculated here so we can just dump it out
@@ -870,13 +887,6 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
         if CASE_BASED_SPLIT:
             ranks = []
             rp = []
-            pDict = {
-                'VARIANT_OF_UNCERTAIN_SIGNIFICANCE' : 3,
-                'LIKELY_PATHOGENIC' : 4,
-                'PATHOGENIC' : 5
-            }
-            pList = ['VARIANT_OF_UNCERTAIN_SIGNIFICANCE', 'LIKELY_PATHOGENIC', 'PATHOGENIC']
-            #pList = ['LIKELY_PATHOGENIC', 'PATHOGENIC']
 
             rDict = {}
             
@@ -926,13 +936,6 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
         ranks = []
         i = 0
         rp = []
-        pDict = {
-            'VARIANT_OF_UNCERTAIN_SIGNIFICANCE' : 3,
-            'LIKELY_PATHOGENIC' : 4,
-            'PATHOGENIC' : 5
-        }
-        pList = ['VARIANT_OF_UNCERTAIN_SIGNIFICANCE', 'LIKELY_PATHOGENIC', 'PATHOGENIC']
-        #pList = ['LIKELY_PATHOGENIC', 'PATHOGENIC']
 
         rDict = {}
         
@@ -989,7 +992,10 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
             resultsDict['EXOMISER']['TEST_RANKINGS'][v] = rDict[pDict[v]]
 
     #ROC curve
-    plotFN = '/Users/matt/githubProjects/VarSight/paper/codi_rf_roc.png'
+    if args.path_only:
+        plotFN = '/Users/matt/githubProjects/VarSight/paper/codi_rf_roc_pathOnly.png'
+    else:
+        plotFN = '/Users/matt/githubProjects/VarSight/paper/codi_rf_roc.png'
     plt.figure()
     plt.plot([0, 1], [0, 1], 'k--')
     
@@ -1010,7 +1016,10 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
     plt.close()
     
     #precision recall curve
-    plotFN = '/Users/matt/githubProjects/VarSight/paper/codi_rf_pr.png'
+    if args.path_only:
+        plotFN = '/Users/matt/githubProjects/VarSight/paper/codi_rf_pr_pathOnly.png'
+    else:
+        plotFN = '/Users/matt/githubProjects/VarSight/paper/codi_rf_pr.png'
     plt.figure()
     
     for i, (label2, raw_clf, raw_params) in enumerate(classifiers):
@@ -1042,26 +1051,37 @@ def jsonDumpFix(o):
         return o.tolist()
     raise TypeError(str(o)+' '+str(type(o)))
 
-def generateLaTeXResult(d):
+def generateLaTeXResult(args, d):
     '''
     This function takes a dictionary of values from our results and makes the calls to render those results through
     Jinja2 into LaTeX files for the paper.
+    @param args - the command line arguments
+    @param d - the data dictionary to hand to any templating
     '''
     from jinja2 import Environment, FileSystemLoader
     rootPath = '/Users/matt/githubProjects/VarSight/paper/'
     env = Environment(loader=FileSystemLoader(rootPath))
     
+    if args.path_only:
+        dataFN = rootPath+'/data_rendered_pathOnly.tex'
+        classifierFN = rootPath+'/classifier_rendered_pathOnly.tex'
+        featuresFN = rootPath+'/features_rendered_pathOnly.tex'
+    else:
+        dataFN = rootPath+'/data_rendered.tex'
+        classifierFN = rootPath+'/classifier_rendered.tex'
+        featuresFN = rootPath+'/features_rendered.tex'
+
     #this is the main data template
     template = env.get_template('data_template.tex')
     rendered = template.render(d)
-    fp = open(rootPath+'/data_rendered.tex', 'wt+')
+    fp = open(dataFN, 'wt+')
     fp.write(rendered)
     fp.close()
 
     #render the classifier only template
     template = env.get_template('classifier_template.tex')
     rendered = template.render(d)
-    fp = open(rootPath+'/classifier_rendered.tex', 'wt+')
+    fp = open(classifierFN, 'wt+')
     fp.write(rendered)
     fp.close()
 
@@ -1088,7 +1108,7 @@ def generateLaTeXResult(d):
     ]
     template = env.get_template('features_template.tex')
     rendered = template.render(featDict)
-    fp = open(rootPath+'/features_rendered.tex', 'wt+')
+    fp = open(featuresFN, 'wt+')
     fp.write(rendered)
     fp.close()
 
@@ -1140,13 +1160,16 @@ def runAnalysis(args):
     '''
     Core function for joining our pieces together
     '''
-    resultJsonFN = '/Users/matt/githubProjects/VarSight/paper/results.json'
+    if args.path_only:
+        resultJsonFN = '/Users/matt/githubProjects/VarSight/paper/results_path_only.json'
+    else:
+        resultJsonFN = '/Users/matt/githubProjects/VarSight/paper/results.json'
     REGENERATE_DATA = args.regenerate
 
     if REGENERATE_DATA or not os.path.exists(resultJsonFN):
-        (xFinal, yFinal, featureLabels, startIndices, allRepDicts, exomiserRanks) = loadFormattedData()
+        (xFinal, yFinal, featureLabels, startIndices, allRepDicts, exomiserRanks) = loadFormattedData(args)
         resultsDict = runClassifiers(args, xFinal, yFinal, featureLabels, startIndices, allRepDicts, exomiserRanks)
-
+        
         fp = open(resultJsonFN, 'wt+')
         json.dump(resultsDict, fp, default=jsonDumpFix)
         fp.close()
@@ -1155,11 +1178,20 @@ def runAnalysis(args):
     resultsDict = json.load(fp)
     fp.close()
 
-    print(json.dumps(resultsDict, indent=4, sort_keys=True))
-    resultsDict['np'] = np
-    resultsDict['len'] = len
-    generateLaTeXResult(resultsDict)
-    generateViolinPlots(resultsDict)
+    if args.path_only:
+        print('PATH_ONLY, not integrated into main paper')
+        resultsDict['np'] = np
+        resultsDict['len'] = len
+        resultsDict['LEVELS'] = ['OVERALL', 'LIKELY_PATHOGENIC', 'PATHOGENIC']
+        generateLaTeXResult(args, resultsDict)
+        
+    else:
+        print(json.dumps(resultsDict, indent=4, sort_keys=True))
+        resultsDict['np'] = np
+        resultsDict['len'] = len
+        resultsDict['LEVELS'] = ['OVERALL', 'VARIANT_OF_UNCERTAIN_SIGNIFICANCE', 'LIKELY_PATHOGENIC', 'PATHOGENIC']
+        generateLaTeXResult(args, resultsDict)
+        generateViolinPlots(resultsDict)
 
 if __name__ == '__main__':
     p = ap.ArgumentParser(description='script for running analysis for VarSight', formatter_class=ap.RawTextHelpFormatter)
@@ -1169,6 +1201,7 @@ if __name__ == '__main__':
 
     sp2 = sp.add_parser('analyze', help='train and test the classifiers')
     sp2.add_argument('-R', '--regenerate', dest='regenerate', action='store_true', default=False, help='regenerate all test results even if already available')
+    sp2.add_argument('-P', '--path-only', dest='path_only', action='store_true', default=False, help='only uses pathogenic and likely pathogenic variants as true positives')
     ex_group = sp2.add_mutually_exclusive_group()
     ex_group.add_argument('-e', '--exact-mode', dest='training_mode', action='store_const', const=EXACT_MODE, help='use the dev-specified hyperparameters (single-execution)', default=EXACT_MODE)
     ex_group.add_argument('-g', '--grid-mode', dest='training_mode', action='store_const', const=GRID_MODE, help='perform a grid search for the best hyperparameters (long multi-execution)', default=EXACT_MODE)
