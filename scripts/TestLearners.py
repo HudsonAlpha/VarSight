@@ -62,7 +62,7 @@ def getPyxisMapResults():
     hpoOnt = HPOUtil.HPOUtil(ontFN, annotFN)
     
     #load case data and go through them searching for HPO terms
-    caseData = SummaryDBUtil.loadSummaryDatabase(altIDMap)
+    caseData = SummaryDBUtil.loadSummaryDatabase(altIDMap, False)
     for sl in sorted(caseData.keys()):
         #TODO: figure out how to properly handle this
         if '/' in sl:

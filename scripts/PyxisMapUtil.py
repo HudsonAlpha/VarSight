@@ -17,7 +17,6 @@ def getPyxisMapResults(hpoTerms):
     '''
     #TODO: make this URL configurable?
     pyxisURL = 'http://0.0.0.0:4999/rank'
-    #pyxisURL = 'http://pyxismap.haib.org/rank'
     headers = {'Content-type': 'application/json'}
     data_json = json.dumps(sorted(hpoTerms))
     
