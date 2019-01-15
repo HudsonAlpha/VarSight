@@ -1,0 +1,667 @@
+{
+  "name": "custom filter",
+  "queries": [
+    {
+      "criteria": {
+        "crossSamples": [],
+        "op": [
+          "GREATER_THAN_OR_EQUAL"
+        ],
+        "val": [
+          "8"
+        ],
+        "origVal": []
+      },
+      "field": "total depth",
+      "filters": [],
+      "logic": "INCLUDE",
+      "name": "Total Depth",
+      "scopes": [
+        "VARIANT"
+      ]
+    },
+    {
+      "criteria": {
+        "crossSamples": [],
+        "op": [
+          "GREATER_THAN_OR_EQUAL"
+        ],
+        "val": [
+          "15"
+        ],
+        "origVal": []
+      },
+      "field": "percent reads",
+      "filters": [],
+      "logic": "INCLUDE",
+      "name": "Percentage of Reads Supporting Allele",
+      "scopes": [
+        "VARIANT"
+      ]
+    },
+    {
+      "filters": [
+        {
+          "filters": [
+            {
+              "criteria": {
+                "crossSamples": [],
+                "op": [
+                  "LESS_THAN_OR_EQUAL"
+                ],
+                "val": [
+                  "0.01"
+                ],
+                "origVal": []
+              },
+              "field": "Gnomad Genome AF",
+              "filters": [],
+              "logic": "INCLUDE",
+              "scopes": [
+                "ALLELIC"
+              ]
+            },
+            {
+              "criteria": {
+                "crossSamples": [],
+                "op": [
+                  "LESS_THAN_OR_EQUAL"
+                ],
+                "val": [
+                  "0.005"
+                ],
+                "origVal": []
+              },
+              "field": "ExAC allele freq",
+              "filters": [],
+              "logic": "INCLUDE",
+              "scopes": [
+                "ALLELIC"
+              ]
+            }
+          ],
+          "join": "AND",
+          "logic": "INCLUDE",
+          "name": "1% Population AF",
+          "scopes": []
+        },
+        {
+          "filters": [
+            {
+              "criteria": {
+                "crossSamples": [],
+                "op": [
+                  "LESS_THAN_OR_EQUAL"
+                ],
+                "val": [
+                  "0.05"
+                ],
+                "origVal": []
+              },
+              "field": "Gnomad Genome AF",
+              "filters": [],
+              "logic": "INCLUDE",
+              "scopes": [
+                "ALLELIC"
+              ]
+            },
+            {
+              "criteria": {
+                "crossSamples": [],
+                "op": [
+                  "LESS_THAN_OR_EQUAL"
+                ],
+                "val": [
+                  "0.05"
+                ],
+                "origVal": []
+              },
+              "field": "ExAC allele freq",
+              "filters": [],
+              "logic": "INCLUDE",
+              "scopes": [
+                "ALLELIC"
+              ]
+            },
+            {
+              "criteria": {
+                "crossSamples": [],
+                "op": [
+                  "CONTAINS"
+                ],
+                "val": [
+                  "High"
+                ],
+                "origVal": []
+              },
+              "field": "HGMD association confidence",
+              "filters": [],
+              "logic": "INCLUDE",
+              "name": "",
+              "scopes": [
+                "ALLELIC"
+              ]
+            },
+            {
+              "criteria": {
+                "crossSamples": [],
+                "op": [
+                  "CONTAINS"
+                ],
+                "val": [
+                  "DM"
+                ],
+                "origVal": []
+              },
+              "field": "HGMD assessment type",
+              "filters": [],
+              "logic": "INCLUDE",
+              "name": "",
+              "scopes": [
+                "ALLELIC"
+              ]
+            }
+          ],
+          "join": "AND",
+          "logic": "INCLUDE",
+          "name": "HGMD AF",
+          "scopes": []
+        },
+        {
+          "filters": [
+            {
+              "criteria": {
+                "crossSamples": [],
+                "op": [
+                  "LESS_THAN_OR_EQUAL"
+                ],
+                "val": [
+                  "0.05"
+                ],
+                "origVal": []
+              },
+              "field": "ExAC allele freq",
+              "filters": [],
+              "logic": "INCLUDE",
+              "name": "",
+              "scopes": [
+                "ALLELIC"
+              ]
+            },
+            {
+              "criteria": {
+                "crossSamples": [],
+                "op": [
+                  "LESS_THAN_OR_EQUAL"
+                ],
+                "val": [
+                  "0.05"
+                ],
+                "origVal": []
+              },
+              "field": "Gnomad Genome AF",
+              "filters": [],
+              "logic": "INCLUDE",
+              "name": "",
+              "scopes": [
+                "ALLELIC"
+              ]
+            },
+            {
+              "criteria": {
+                "crossSamples": [],
+                "op": [
+                  "CONTAINS"
+                ],
+                "val": [
+                  "Patho",
+                  "patho",
+                  "drug"
+                ],
+                "origVal": []
+              },
+              "field": "ClinVar Classification",
+              "filters": [],
+              "join": "OR",
+              "logic": "INCLUDE",
+              "name": "",
+              "scopes": [
+                "ALLELIC"
+              ]
+            }
+          ],
+          "join": "AND",
+          "logic": "INCLUDE",
+          "scopes": []
+        },
+        {
+          "filters": [
+            {
+              "criteria": {
+                "crossSamples": [],
+                "op": [
+                  "EQUALS"
+                ],
+                "val": [
+                  "1"
+                ],
+                "origVal": []
+              },
+              "field": "chromosome",
+              "filters": [],
+              "logic": "INCLUDE",
+              "name": "",
+              "scopes": [
+                "VARIANT"
+              ]
+            },
+            {
+              "criteria": {
+                "crossSamples": [],
+                "op": [
+                  "EQUALS"
+                ],
+                "val": [
+                  "169519049"
+                ],
+                "origVal": []
+              },
+              "field": "position",
+              "filters": [],
+              "logic": "INCLUDE",
+              "name": "",
+              "scopes": [
+                "VARIANT"
+              ]
+            }
+          ],
+          "join": "AND",
+          "logic": "INCLUDE",
+          "scopes": []
+        }
+      ],
+      "join": "OR",
+      "logic": "INCLUDE",
+      "name": "Population Allele Frequency",
+      "scopes": []
+    },
+    {
+      "filters": [
+        {
+          "criteria": {
+            "crossSamples": [],
+            "op": [
+              "DOES_NOT_EQUAL"
+            ],
+            "val": [
+              "NA"
+            ],
+            "origVal": []
+          },
+          "field": "HGMD Accession",
+          "filters": [],
+          "logic": "INCLUDE",
+          "name": "HGMD Allele Match",
+          "scopes": [
+            "ALLELIC"
+          ]
+        },
+        {
+          "criteria": {
+            "crossSamples": [],
+            "op": [
+              "DOES_NOT_EQUAL"
+            ],
+            "val": [
+              "NA"
+            ],
+            "origVal": []
+          },
+          "field": "ClinVar Accession ID",
+          "filters": [],
+          "logic": "INCLUDE",
+          "name": "ClinVar Allele Match",
+          "scopes": [
+            "ALLELIC"
+          ]
+        },
+        {
+          "criteria": {
+            "crossSamples": [],
+            "op": [
+              "CONTAINS"
+            ],
+            "val": [
+              "Possible Frameshift",
+              "Premature Stop",
+              "Possible Start Site Alteration",
+              "Stop Codon Read Through",
+              "Non-synonymous",
+              "Splice Site Alteration",
+              "AA Deletion",
+              "AA Duplication",
+              "AA Insertion",
+              "AA Indel",
+              "Possible Splicing Modifier",
+              "Whole Intron Deletion",
+              "Whole Exon Deletion",
+              "Possible Promoter Disruption"
+            ],
+            "origVal": []
+          },
+          "field": "Effects",
+          "filters": [],
+          "join": "OR",
+          "logic": "INCLUDE",
+          "scopes": [
+            "VARIANT_TRANSCRIPT"
+          ]
+        },
+        {
+          "criteria": {
+            "crossSamples": [],
+            "op": [
+              "GREATER_THAN_OR_EQUAL"
+            ],
+            "val": [
+              "30"
+            ],
+            "origVal": []
+          },
+          "field": "CADD Scaled",
+          "filters": [],
+          "logic": "INCLUDE",
+          "name": "",
+          "scopes": [
+            "ALLELIC"
+          ]
+        }
+      ],
+      "join": "OR",
+      "logic": "INCLUDE",
+      "name": "HGMD, ClinVar, CADD and Effects",
+      "scopes": []
+    },
+    {
+      "criteria": {
+        "crossSamples": [],
+        "op": [
+          "EQUALS"
+        ],
+        "val": [
+          "NA"
+        ],
+        "origVal": []
+      },
+      "field": "disease name",
+      "filters": [],
+      "logic": "EXCLUDE",
+      "name": "Gene Has Associated Disease",
+      "scopes": [
+        "DISEASE",
+        "GENE"
+      ]
+    },
+    {
+      "criteria": {
+        "crossSamples": [],
+        "op": [
+          "DOES_NOT_EQUAL"
+        ],
+        "val": [
+          "NA"
+        ],
+        "origVal": []
+      },
+      "field": "Red Herring Category",
+      "filters": [],
+      "logic": "EXCLUDE",
+      "name": "Red Herring Variants",
+      "scopes": [
+        "ALLELIC"
+      ]
+    },
+    {
+      "filters": [
+        {
+          "criteria": {
+            "crossSamples": [],
+            "op": [
+              "DOES_NOT_EQUAL"
+            ],
+            "val": [
+              "NA"
+            ],
+            "origVal": []
+          },
+          "field": "variant_attribute",
+          "filters": [],
+          "logic": "INCLUDE",
+          "name": "",
+          "scopes": [
+            "ALLELIC"
+          ]
+        },
+        {
+          "criteria": {
+            "crossSamples": [],
+            "op": [
+              "EQUALS"
+            ],
+            "val": [
+              "NA"
+            ],
+            "origVal": []
+          },
+          "field": "HGMD Accession",
+          "filters": [],
+          "logic": "INCLUDE",
+          "name": "",
+          "scopes": [
+            "ALLELIC"
+          ]
+        },
+        {
+          "criteria": {
+            "crossSamples": [],
+            "op": [
+              "EQUALS"
+            ],
+            "val": [
+              "NA"
+            ],
+            "origVal": []
+          },
+          "field": "ClinVar Accession ID",
+          "filters": [],
+          "logic": "INCLUDE",
+          "name": "",
+          "scopes": [
+            "ALLELIC"
+          ]
+        }
+      ],
+      "join": "AND",
+      "logic": "EXCLUDE",
+      "name": "Repeats",
+      "scopes": []
+    },
+    {
+      "filters": [
+        {
+          "criteria": {
+            "crossSamples": [],
+            "op": [
+              "EQUALS"
+            ],
+            "val": [
+              "NA"
+            ],
+            "origVal": []
+          },
+          "field": "HGMD Accession",
+          "filters": [],
+          "logic": "INCLUDE",
+          "name": "",
+          "scopes": [
+            "ALLELIC"
+          ]
+        },
+        {
+          "criteria": {
+            "crossSamples": [],
+            "op": [
+              "LESS_THAN"
+            ],
+            "val": [
+              "10"
+            ],
+            "origVal": []
+          },
+          "field": "CADD Scaled",
+          "filters": [],
+          "logic": "INCLUDE",
+          "name": "",
+          "scopes": [
+            "ALLELIC"
+          ]
+        },
+        {
+          "criteria": {
+            "crossSamples": [],
+            "op": [
+              "EQUALS"
+            ],
+            "val": [
+              "Unknown"
+            ],
+            "origVal": []
+          },
+          "field": "Effects",
+          "filters": [],
+          "logic": "INCLUDE",
+          "name": "",
+          "scopes": [
+            "VARIANT_TRANSCRIPT"
+          ]
+        }
+      ],
+      "join": "AND",
+      "logic": "EXCLUDE",
+      "name": "Unknowns",
+      "scopes": []
+    },
+    {
+      "filters": [
+        {
+          "criteria": {
+            "crossSamples": [],
+            "op": [
+              "EQUALS"
+            ],
+            "val": [
+              "Near Splice Site Alteration"
+            ],
+            "origVal": []
+          },
+          "field": "Effects",
+          "filters": [],
+          "logic": "INCLUDE",
+          "name": "",
+          "scopes": [
+            "VARIANT_TRANSCRIPT"
+          ]
+        },
+        {
+          "filters": [
+            {
+              "criteria": {
+                "crossSamples": [],
+                "op": [
+                  "LESS_THAN"
+                ],
+                "val": [
+                  "0.6"
+                ],
+                "origVal": []
+              },
+              "field": "ADA Boost Splice Prediction",
+              "filters": [],
+              "logic": "INCLUDE",
+              "name": "",
+              "scopes": [
+                "VARIANT_TRANSCRIPT"
+              ]
+            },
+            {
+              "criteria": {
+                "crossSamples": [],
+                "op": [
+                  "LESS_THAN"
+                ],
+                "val": [
+                  "0.6"
+                ],
+                "origVal": []
+              },
+              "field": "Random Forest Splice Prediction",
+              "filters": [],
+              "logic": "INCLUDE",
+              "name": "",
+              "scopes": [
+                "VARIANT_TRANSCRIPT"
+              ]
+            }
+          ],
+          "join": "OR",
+          "logic": "INCLUDE",
+          "scopes": []
+        },
+        {
+          "criteria": {
+            "crossSamples": [],
+            "op": [
+              "CONTAINS"
+            ],
+            "val": [
+              "Patho",
+              "patho"
+            ],
+            "origVal": []
+          },
+          "field": "ClinVar Classification",
+          "filters": [],
+          "join": "OR",
+          "logic": "EXCLUDE",
+          "name": "",
+          "scopes": [
+            "ALLELIC"
+          ]
+        },
+        {
+          "criteria": {
+            "crossSamples": [],
+            "op": [
+              "GREATER_THAN_OR_EQUAL"
+            ],
+            "val": [
+              "10"
+            ],
+            "origVal": []
+          },
+          "field": "CADD Scaled",
+          "filters": [],
+          "logic": "EXCLUDE",
+          "name": "",
+          "scopes": [
+            "ALLELIC"
+          ]
+        }
+      ],
+      "join": "AND",
+      "logic": "EXCLUDE",
+      "name": "Near Splice",
+      "scopes": []
+    }
+  ]
+}
