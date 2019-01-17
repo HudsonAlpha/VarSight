@@ -75,6 +75,7 @@ def createLayerImage(layerPrefix, layerDict):
 
 REP_DICT = {
     "GREATER_THAN_OR_EQUAL" : "&ge;",
+    "GREATER_THAN" : "&gt;",
     "EQUALS" : "==",
     "DOES_NOT_EQUAL" : "&ne;",
     "LESS_THAN_OR_EQUAL" : "&le;",
@@ -123,21 +124,6 @@ def recurseCriteria(fp, currDict, nodeLabelList):
         
         if allSingles:
             #this is all single values comparisons, make one box
-            recordRows = []
-            '''
-            for subFilter in currDict['filters']:
-                assert(len(subFilter['criteria']['op']) == 1)
-                relat = REP_DICT.get(subFilter['criteria']['op'][0], subFilter['criteria']['op'][0])
-                rowEntry = [subFilter['logic'], subFilter['field'], relat, '\\n'.join(subFilter['criteria']['val'])]
-                recordRows.append('{'+'|'.join(rowEntry)+'}')
-
-            recordRows.append('JOIN('+currDict['join']+')')
-            recordRows.append(currDict['logic'])
-            recordLabel = "{"+'|'.join(recordRows)+"}"
-            nodeJoin = 'join'+'v'.join([str(x) for x in nodeLabelList])
-            fp.write('\t\t'+nodeJoin+' [shape=record label="'+recordLabel+'"];\n')
-            '''
-            
             recordLabel = '<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4">'
             recordLabel += '<TR><TD COLSPAN="4">'+currDict['logic']+'</TD></TR>'
             recordLabel += '<TR><TD COLSPAN="4">BEGIN: JOIN('+currDict['join']+')</TD></TR>'
