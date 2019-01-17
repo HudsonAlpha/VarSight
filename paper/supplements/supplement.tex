@@ -1,0 +1,123 @@
+\documentclass{article}
+\usepackage{graphicx}
+\usepackage{rotating}
+
+\begin{document}
+
+\title{Supplementary Document}
+\author{James M. Holt {\it et~al.}}
+
+\maketitle
+
+\tableofcontents
+
+\section{Filtering}
+The following sections describes the filter that was passed to Codicem for generating the test and training set variants.  Figure \ref{fig:filter_overview} shows the sequential order of filters, and the following subsections briefly describes each filter unit's purpose.
+
+\begin{figure}
+\centering
+\includegraphics[width=.45\textwidth]{filter_supplement_overall.png}
+\caption{Filter overview.  This high level image shows the sequential order of filtering, descriptions of sub-filters can be found in other sections.}
+\label{fig:filter_overview}
+\end{figure}
+
+\subsection{Total Depth filter}
+
+\begin{figure}
+\centering
+\includegraphics[width=.45\textwidth]{filter_supplement_layer0.png}
+\caption{Total Depth filter.  This filter is primarily a QC-related filter that only passes variants with at least 8 reads covering the locus.}
+\label{fig:filter0}
+\end{figure}
+
+The total depth filter is primarily a QC-related filter intended to remove variant calls with total coverage.  This filter only passes variants that have at least 8 reads overlapping the locus.  Figure \ref{fig:filter0} shows a visualization of the filter.
+
+\subsection{Percentage of Reads Supporting Allele filter.}
+
+\begin{figure}
+\centering
+\includegraphics[width=.6\textwidth]{filter_supplement_layer1.png}
+\caption{Percentage of Reads Supporting Allele filter.  This filter is primarily a QC-related filter that only passes variants with at least 15\% of the locus' reads supporting the alternate allele.}
+\label{fig:filter1}
+\end{figure}
+
+This filter is also a QC-related filter intended to remove variant calls with low support for the alternate allele.  The filter only passes variants with more than 15\% of the reads supporting the alternate allele.  Figure \ref{fig:filter1} shows a visualization of the filter.
+
+\subsection{Population Allele Frequency filter.}
+
+\begin{sidewaysfigure}
+\centering
+\includegraphics[width=\textwidth]{filter_supplement_layer2.png}
+\caption{Population Allele Frequency filter.  This filter is primarily designed to filter out variants with a high population frequency.  It relies mostly on GnomAD and ExAC to determine allele frequencies.  Variants that are only semi-rare are allowed through if there are appropriate HGMD or ClinVar annotations supporting them.  Additionally, one variant in gene {\it F5} (rs6025) is allowed through because the reference allele is actually the rare, pathogenic allele.}
+\label{fig:filter2}
+\end{sidewaysfigure}
+
+This filter removes variants that have a high population frequency.  There are three general ways for a variant to pass this filter: 1) be a rare variant in GnomAD AND a rare variant in ExAC; 2) be semi-rare in GnomAD, semi-rare in ExAC, AND have a high-confidence damaging annotation from HGMD; or 3) be semi-rare in GnomAD, semi-rare in ExAC, AND have a ClinVar classification labeling it as pathogenic, likely pathogenic, or a drug response.  Additionally, there is one variant from the gene {\it F5} (rs6025) allowed through this filter.  Note that this specific variant has a very high alternate allele frequency because the reference allele is actually the disease-causing mutation.  Figure \ref{fig:filter2} shows a visualization of the filter.
+
+\subsection{HGMD, ClinVar, CADD, and Effects filter}
+
+\begin{figure}
+\centering
+\includegraphics[width=.80\textwidth]{filter_supplement_layer3.png}
+\caption{HGMD, ClinVar, CADD, and Effects filter.  This filter is primarily designed to filter out variants that are not predicted or annotated to have an effect on a transcript.}
+\label{fig:filter3}
+\end{figure}
+
+This filter removes variants that are not predicted or annotated to have an effect on a transcript.  A variant can pass this filter in any of four ways: 1) have an HGMD accession, 2) have a ClinVar accession, 3) have an effect that is predicted to modify a transcript, or 4) have a very high CADD score.  Figure \ref{fig:filter3} shows a visualization of the filter.
+
+\subsection{Gene Has Associated Disease filter}
+
+\begin{figure}
+\centering
+\includegraphics[width=.45\textwidth]{filter_supplement_layer4.png}
+\caption{Gene Has Associated Disease filter.  This filter removes variants for which there is no annotated disease name in HGMD, OMIM, or ClinVar.}
+\label{fig:filter4}
+\end{figure}
+
+This filter removes variants for which there is no annotated disease name in HGMD, OMIM, or ClinVar.  If any of those annotations for the variant has a disease name, then the variant will pass this filter.  Figure \ref{fig:filter4} shows a visualization of the filter.
+
+\subsection{Red Herring filter}
+
+\begin{figure}
+\centering
+\includegraphics[width=.45\textwidth]{filter_supplement_layer5.png}
+\caption{Red Herring filter.  This filter removes variants that are commonly found through sequencing, but do not appear in population databases like gnomAD or ExAC.  These variants are believed to be sequencing artifacts, so they are labeled as ``Red Herring" variants and filtered out.}
+\label{fig:filter5}
+\end{figure}
+
+This filter removes variants that are sequencing artifacts.  Our analysts found that some variants are not found in population databases, but show up frequently ($>20$\% of samples) in our sequencing data.  These variants are believed to be sequencing artifacts, so Codicem maintains a database of these variants to filter out during analysis.  Figure \ref{fig:filter5} shows a visualization of the filter.
+
+\subsection{Repeats filter}
+
+\begin{figure}
+\centering
+\includegraphics[width=.65\textwidth]{filter_supplement_layer6.png}
+\caption{Repeats filter.  This filter removes variants found in repeat tracks if there is no associated entry in HGMD or ClinVar.  These variants are generally considered polymorphic and/or sequencing artifacts unless there are annotations from disease databases.}
+\label{fig:filter6}
+\end{figure}
+
+This filter removes variants that are polymorphic repeats and/or artifacts from sequencing.  It filters out any variants that are found in repeat tracks if there is no associated entry in HGMD or ClinVar.  Figure \ref{fig:filter6} shows a visualization of the filter.
+
+\subsection{Unknowns filter}
+
+\begin{figure}
+\centering
+\includegraphics[width=.65\textwidth]{filter_supplement_layer7.png}
+\caption{Unknowns filter.  This filter removed variants with an ``Unknown" effect on transcription if there is not additional support for that variant through either CADD or HGMD.}
+\label{fig:filter7}
+\end{figure}
+
+This filter removes variants that have an ``Unknown" effect on transcription if there isn't additional support for that variant through either CADD or HGMD.  If CADD is greater than 10 or there is an HGMD accession tied to the variant, it will pass this filter.  Figure \ref{fig:filter7} shows a visualization of the filter.
+
+\subsection{Near Splice filter}
+
+\begin{sidewaysfigure}
+\centering
+\includegraphics[width=\textwidth]{filter_supplement_layer8.png}
+\caption{Near Splice filter.  This filter removes ``Near Splice Site Alteration" variants that are not supported to be deleterious by splice prediction algorithms, ClinVar annotations, or CADD predictions.}
+\label{fig:filter8}
+\end{sidewaysfigure}
+
+This filter removes near splice variants that do not have additional annotated or predicted support indicating that the variant would impact splicing.  If a variant is a ``Near Splice Site Alteration", that variant will only pass the filter if one of the following is true: 1) both splice predictions algorithms predict an impact on splicing, 2) ClinVar has a pathogenic or likely pathogenic annotation, or 3) CADD is relatively high.  Figure \ref{fig:filter8} shows a visualization of the filter. 
+
+\end{document}
