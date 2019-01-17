@@ -20,6 +20,15 @@ paper/natbib.bst
 paper/OUP_First_SBk_Bot_8401-eps-converted-to.pdf
 paper/OUP_First_SBk_Bot_8401.eps
 paper/plain.bst
+paper/supplements/filter_supplement_layer?.dot
+paper/supplements/filter_supplement_layer?.png
+paper/supplements/filter_supplement_overall.dot
+paper/supplements/filter_supplement_overall.png
+paper/supplements/supplement.aux
+paper/supplements/supplement.log
+paper/supplements/supplement.pdf
+paper/supplements/supplement.synctex.gz
+paper/supplements/supplement.toc
 pyxis_ranks_*
 scripts/__pycache__
 scripts/DownloadCodiResults.py
