@@ -31,3 +31,8 @@ The following files perform the core workhorse training, testing, and reporting 
     -r, --random-mode  perform a random search for the best hyperparameters
                         (short multi-execution)
     ```
+
+## Paper Scripts
+The following files were used to generate data and/or figure for the paper and supplementary documents:
+1. SupplementGen.py - This script parses the Codicem filter JSON file and creates some .dot files that `graphviz` converts into figures for the supplementary document.  These figures visualize the filtering process that was by Codicem before returning results to analysts.  We use the variants that pass this filter for training and testing the classifiers that are a part of the core paper.
+2. TestLearners.py - Refer to "Training/Testing Scripts" section
