@@ -120,12 +120,13 @@ def loadFormattedData(args):
     '''
     This function is primarily about loading and formatting data prior to training/testing any classifiers.
     @param args - arguments from the command line
-    @return - tuple (xFinal, yFinal, featureLabels, startIndices, allRepDicts)
+    @return - tuple (xFinal, yFinal, featureLabels, startIndices, allRepDicts, exomiserRanks)
         xFinal - an NxM matrix where N is the number of variants in our test/training set and M is the number of features; contains feature values
         yFinal - an N length array where N is the number of variants in our test/training set; 1 if the variant was reported
         featureLabels - an M length array containing feature labels for our output benefit
         startIndices - a (C+1) length array containing the start indices of variants from an individual case
         allRepDicts - an N length array of None or dictionaries; if a dictionary, it contains data on a returned variant
+        exomiserRanks - a list of lists containing exomiser ranks on a per-case basis; missing values are -1*len(ranked variants)
     '''
     pyxisRootDir = '/Users/matt/githubProjects/VarSight/pyxis_ranks_'+PYXIS_DATE
     
@@ -528,16 +529,12 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
     @param featureLabels - C length array containing labels (strings) for the features
     @param startIndices - the startIndices of individual cases in the training set
     @param allRepDicts - a list of dictionaries for variants that were reported; non-reported vars are None
-    @param exomiserRanks - paired exomiser ranks for each case; needs to be split up with train/test
+    @param exomiserRanks - paired exomiser ranks for each case; needs to be split up with train/test; missing values are -1*len(ranked variants)
     @return resultsDict - a dictionary containing many results we wish to include in a paper
     '''
     resultsDict = {}
     resultsDict['FEATURE_LABELS'] = featureLabels
     print('Values:', values.shape)
-    
-    #V1
-    #Classifications (and bincount): (36346,) [36165   181]
-    #Num cases: 108
     print('Classifications (and bincount):', classifications.shape, np.bincount(classifications))
     print('Num cases:', len(startIndices)-1)
 
@@ -566,13 +563,14 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
         train_dicts = []
         tpTrain = 0
         exomiserTrain = []
+
         testXArray = []
         testYArray = []
         test_indices = [0]
         test_dicts = []
         tpTest = 0
         exomiserTest = []
-        
+
         #ratio of TRAIN:TEST
         invRat = 1.0/TEST_SIZE - 1
 
@@ -587,7 +585,10 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
                 train_indices.append(train_indices[-1]+(et-st))
                 train_dicts += allRepDicts[st:et]
                 tpTrain += tpCount
+
+                #we moved the data manipulation down
                 exomiserTrain.append(exomiserRanks[x])
+
             else:
                 #we need more in our test
                 testXArray.append(values[st:et])
@@ -595,6 +596,8 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
                 test_indices.append(test_indices[-1]+(et-st))
                 test_dicts += allRepDicts[st:et]
                 tpTest += tpCount
+
+                #we moved the data manipulation down
                 exomiserTest.append(exomiserRanks[x])
         
         #join them all together
@@ -603,15 +606,9 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
         test_x = np.vstack(testXArray)
         test_y = np.hstack(testYArray)
 
-        #V1
-        #split sizes (26820, 50) (9526, 50) (26820,) (9526,)
-
     else:
         #train without any regards to case labels
         train_x, test_x, train_y, test_y = train_test_split(values, classifications, test_size=TEST_SIZE, stratify=classifications)
-
-        #V1
-        #split sizes (27259, 50) (9087, 50) (27259,) (9087,)
 
     print('split sizes', train_x.shape, test_x.shape, train_y.shape, test_y.shape)
     
@@ -675,6 +672,9 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
     prs = []
     pr_aucs = []
     resultsDict['CLASSIFIERS'] = {}
+
+    #uncomment to short circuit
+    #classifiers = []
 
     for clf_label, raw_clf, hyperparam in classifiers:
         #test the classifier?
@@ -931,65 +931,89 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
                 resultsDict['COMPARISON'][csLabel]['TEST_RANKINGS'][v] = rDict[pDict[v]]
     
     #now do exomiser stuff
-    resultsDict['EXOMISER'] = {}
     if CASE_BASED_SPLIT:
-        ranks = []
-        i = 0
-        rp = []
+        exomiserDatasets = [
+            'EXOMISER_BEST',
+            'EXOMISER_AVERAGE'
+        ]
 
-        rDict = {}
-        
-        #now do the test sets as if they were individual cases
-        for x in range(0, len(test_indices)-1):
-            st = test_indices[x]
-            et = test_indices[x+1]
+        for exomiserLabel in exomiserDatasets:
+            resultsDict[exomiserLabel] = {}
+            ranks = []
+            i = 0
+            rp = []
 
-            #dataColumn is sorted such that highest is biggest rank
-            case_d = test_dicts[st:et]
+            rDict = {}
+            missingDict = {}
+            missingArray = []
+            
+            #now do the test sets as if they were individual cases
+            for x in range(0, len(test_indices)-1):
+                st = test_indices[x]
+                et = test_indices[x+1]
 
-            #make the ranks 1-based
-            ranks += [r+1 if r != None else None for r in exomiserTest[x]]
+                #dataColumn is sorted such that highest is biggest rank
+                case_d = test_dicts[st:et]
 
-            for d in case_d:
-                if d != None:
-                    pathLevel = pDict[d['path_level']]
-                    rp.append(pathLevel)
-                    
-                    if (pathLevel not in rDict):
-                        rDict[pathLevel] = []
-                    rDict[pathLevel].append(ranks[i])
-                    i += 1
+                #ranks contain the 0-based index, so we need to add one to it for output comparison
+                #ranks += [r+1 for r in exomiserArray[x]]
+                missingArray += [(r < 0) for r in exomiserTest[x]]
+                if exomiserLabel == 'EXOMISER_BEST':
+                    #absolute value, then 1-base it
+                    ranks += [abs(v)+1 for v in exomiserTest[x]]
+                elif exomiserLabel == 'EXOMISER_AVERAGE':
+                    #average value if missing, then 1-base it
+                    #if less than 0, the value is missing SO find the midpoint of unranked values and set the number to that
+                    #midpoint calc = (# of variants - #ranked)/2.0 + (rank of highest ranked)
+                    ranks += [v+1 if v >= 0 else ((et-st+v)/2.0-v)+1 for v in exomiserTest[x]]
+                else:
+                    raise Exception('Unimplemented exomiser output label: '+exomiserLabel)
 
-        missingCounts = ranks.count(None)
-        ranks = list(filter(lambda v: v != None, ranks))
-        
-        print('Exomiser:')
-        print('\tNum ranked:', len(ranks))
-        print('\tMissing:', missingCounts)
-        print('\tRanks:', ranks)
-        print('\tPatho:', rp)
-        print('\tmean:', np.mean(ranks))
-        print('\tstdev:', np.std(ranks))
-        print('\tmedian:', np.median(ranks))
-        resultsDict['EXOMISER']['MISSING'] = {}
-        resultsDict['EXOMISER']['MISSING']['OVERALL'] = missingCounts
-        resultsDict['EXOMISER']['FOUND'] = {}
-        resultsDict['EXOMISER']['FOUND']['OVERALL'] = len(ranks)
-        resultsDict['EXOMISER']['TEST_RANKINGS'] = {}
-        resultsDict['EXOMISER']['TEST_RANKINGS']['OVERALL'] = ranks
+                for d in case_d:
+                    if d != None:
+                        pathLevel = pDict[d['path_level']]
+                        rp.append(pathLevel)
+                        
+                        if (pathLevel not in rDict):
+                            rDict[pathLevel] = []
+                        rDict[pathLevel].append(ranks[i])
 
-        for v in pList:
-            missingCounts = rDict[pDict[v]].count(None)
-            rDict[pDict[v]] = list(filter(lambda v: v != None, rDict[pDict[v]]))
-            print('\t'+v)
-            print('\t\tMissing:', missingCounts)
-            print('\t\tRanks:', rDict[pDict[v]])
-            print('\t\tmean:', np.mean(rDict[pDict[v]]))
-            print('\t\tstdev:', np.std(rDict[pDict[v]]))
-            print('\t\tmedian:', np.median(rDict[pDict[v]]))
-            resultsDict['EXOMISER']['MISSING'][v] = missingCounts
-            resultsDict['EXOMISER']['FOUND'][v] = len(ranks)
-            resultsDict['EXOMISER']['TEST_RANKINGS'][v] = rDict[pDict[v]]
+                        if (pathLevel not in missingDict):
+                            missingDict[pathLevel] = []
+                        missingDict[pathLevel].append(missingArray[i])
+
+                        i += 1
+
+            ranks = list(filter(lambda v: v != None, ranks))
+            missingCounts = sum(missingArray)
+
+            print(exomiserLabel+':')
+            print('\tNum ranked:', len(ranks))
+            print('\tMissing:', missingCounts)
+            print('\tRanks:', ranks)
+            print('\tPatho:', rp)
+            print('\tmean:', np.mean(ranks))
+            print('\tstdev:', np.std(ranks))
+            print('\tmedian:', np.median(ranks))
+            resultsDict[exomiserLabel]['MISSING'] = {}
+            resultsDict[exomiserLabel]['MISSING']['OVERALL'] = missingCounts
+            resultsDict[exomiserLabel]['FOUND'] = {}
+            resultsDict[exomiserLabel]['FOUND']['OVERALL'] = len(ranks)
+            resultsDict[exomiserLabel]['TEST_RANKINGS'] = {}
+            resultsDict[exomiserLabel]['TEST_RANKINGS']['OVERALL'] = ranks
+
+            for v in pList:
+                missingCounts = rDict[pDict[v]].count(None)
+                rDict[pDict[v]] = list(filter(lambda v: v != None, rDict[pDict[v]]))
+                print('\t'+v)
+                print('\t\tMissing:', sum(missingDict[pDict[v]]))
+                print('\t\tRanks:', rDict[pDict[v]])
+                print('\t\tmean:', np.mean(rDict[pDict[v]]))
+                print('\t\tstdev:', np.std(rDict[pDict[v]]))
+                print('\t\tmedian:', np.median(rDict[pDict[v]]))
+                resultsDict[exomiserLabel]['MISSING'][v] = sum(missingDict[pDict[v]])
+                resultsDict[exomiserLabel]['FOUND'][v] = 'NO_IMPL'
+                resultsDict[exomiserLabel]['TEST_RANKINGS'][v] = rDict[pDict[v]]
 
     #ROC curve
     if args.path_only:
@@ -1002,12 +1026,13 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
     for i, (label2, raw_clf, raw_params) in enumerate(classifiers):
         plt.plot(rocs[i][0], rocs[i][1], label=('%s (%0.4f)' % (label2, aucs[i])))
     
-    for i, label2 in enumerate(comparedScores):
-        plt.plot(csRocs[i][0], csRocs[i][1], label=('%s (%0.4f)' % (label2, csAucs[i])))
+    #Mana pointed out these don't make much sense
+    #leaving as comment if a reviewer gets angsty and we want to add back in
+    #for i, label2 in enumerate(comparedScores):
+    #    plt.plot(csRocs[i][0], csRocs[i][1], label=('%s (%0.4f)' % (label2, csAucs[i])))
 
     plt.xlabel('False positive rate')
     plt.ylabel('True positive rate')
-    #plt.title('ROC curve')
     plt.legend(loc='best')
     plt.xlim(0, 1)
     plt.ylim(0, 1)
@@ -1025,12 +1050,13 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
     for i, (label2, raw_clf, raw_params) in enumerate(classifiers):
         plt.plot(prs[i][0], prs[i][1], label=('%s (%0.4f)' % (label2, pr_aucs[i])))
     
-    for i, label2 in enumerate(comparedScores):
-        plt.plot(csPrs[i][0], csPrs[i][1], label=('%s (%0.4f)' % (label2, csPrAucs[i])))
+    #Mana pointed out these don't make much sense
+    #leaving as comment if a reviewer gets angsty and we want to add back in
+    #for i, label2 in enumerate(comparedScores):
+    #    plt.plot(csPrs[i][0], csPrs[i][1], label=('%s (%0.4f)' % (label2, csPrAucs[i])))
     
     plt.xlabel('Recall')
     plt.ylabel('Precision')
-    #plt.title('PR curve')
     plt.legend(loc='best')
     plt.xlim(0, 1)
     plt.ylim(0, 1)

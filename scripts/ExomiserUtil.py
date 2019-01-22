@@ -48,7 +48,8 @@ def getTargetRanks(sl, foundPrimaries):
         try:
             ind = fullRanks.index(fp)
         except:
-            ind = len(fullRanks)
+            assert(len(fullRanks) != 0)
+            ind = -1*len(fullRanks)
         ret.append(ind)
     return ret
 
