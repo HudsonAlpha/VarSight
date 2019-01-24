@@ -1,8 +1,58 @@
+\newif\ifpreprint
+\preprinttrue
+
+\ifpreprint
+\documentclass{article}
+\else
 \documentclass{bioinfo}
+\fi
+
 \usepackage{caption}
 \usepackage{graphicx}
-\usepackage{multirow}
 \usepackage{hhline}
+\usepackage{multirow}
+
+\ifpreprint
+\usepackage{hyperref}
+\usepackage{natbib}
+\usepackage{amsmath}
+%need these to rotate
+\usepackage{geometry}
+\usepackage{pdflscape}
+\usepackage{scrextend}
+\usepackage{authblk}
+
+\begin{document}
+\title{VarSight: Prioritizing Clinically Reported Variants with Binary Classification Algorithms}
+\author[1]{James M. Holt}
+\author[1]{Brandon Wilk}
+\author[1]{Camille L. Birch}
+\author[1]{Donna M. Brown}
+\author[1]{Manavalan Gajapathy}
+\author[1]{Alexander C. Moss}
+\author[1]{Nadiya Sosonkina}
+\author[1]{Melissa A. Wilk}
+\author[1]{Julie A. Anderson}
+\author[1]{Jeremy M. Harris}
+\author[1]{Jacob M. Kelly}
+\author[1]{Fariba Shaterferdosian}
+\author[1]{Angelina E. Uno-Antonison}
+\author[1]{Arthur Weborg}
+\author[ ]{Undiagnosed Diseases Network}
+\author[1]{Elizabeth A. Worthey}
+\affil[1]{Software Development and Informatics, HudsonAlpha Institute for Biotechnology, Huntsville, 35806, USA}
+\maketitle
+
+\begin{abstract}
+\noindent\textbf{Motivation:} In genomic medicine for rare disease patients, the primary goal is to identify one or more variants that cause their disease.  Typically, this is done through filtering and then prioritization of variants for manual curation.  However, prioritization of variants in rare disease patients remains a challenging task due to the high degree of variability in phenotype presentation and molecular source of disease.  Thus, methods that can identify and/or prioritize variants to be clinically reported in the presence of such variability are of critical importance.  \\
+\textbf{Results:} We tested the application of classification algorithms that ingest variant predictions along with phenotype information for predicting whether a variant will ultimately be clinically reported and returned to a patient.  To test the classifiers, we performed a retrospective study on variants that were clinically reported to 237 patients in the Undiagnosed Diseases Network.  We treated the classifiers as variant prioritization systems and compared them to another variant prioritization algorithm and two single-measure controls. We showed that these classifiers outperformed the other methods with the best classifier ranking 73\% of all reported variants and 97\% of reported pathogenic variants in the top 20.
+\\
+\textbf{Availability:} The scripts used to generate results presented in this paper are available at \href{https://github.com/HudsonAlpha/VarSight}{https://github.com/HudsonAlpha/VarSight}. \\
+\textbf{Contact:} \href{jholt@hudsonalpha.org}{jholt@hudsonalpha.org}\\
+\end{abstract}
+
+\else%begin non-preprint
+
 \copyrightyear{2015} \pubyear{2015}
 
 \access{Advance Access Publication Date: Day Month Year}
@@ -38,6 +88,9 @@ online.}
 
 \maketitle
 
+%end non-preprint
+\fi
+
 \section{Introduction}
 Genome and exome sequencing are both currently being used as molecular diagnostic tools for patients with rare, undiagnosed diseases \citep{ramoni2017, bagnall2018, sweeney2018}.  Typically, these technologies are applied clinically following workflows consisting of blood draw, sequencing, alignment, variant calling, variant annotation, variant filtering, and variant prioritization \citep{worthey2017, roy2018}.  Then, clinical analysts usually perform the more manual processes of inspecting and then clinically reporting variants based on the known set of patient phenotypes.
 
@@ -57,7 +110,11 @@ In this paper, we tested the application of classification algorithms for two pu
 
 Given the above variant information, we split the data into training and testing sets for measuring the performance of classifiers to predict whether a variant would be clinically reported or not.  We tested four classifiers that are readily available in the {\it sklearn} \citep{pedregosa2011} and {\it imblearn} \citep{lemaitre2017} Python modules.  Each classifier calculated probabilities of a variant belonging to the ``returned" class, allowing for both classification analysis and ranking of the variants by their calculated probabilities.  After tuning each classifier, we generated summaries of the performance of each method from both a binary classification perspective and a variant ranking perspective.  All of the scripts to train classifiers, test classifiers, and format results are contained in the VarSight repository.
 
+\ifpreprint
+
+\else
 \begin{methods}
+\fi
 \section{Methods}
 \subsection{Data sources}
 All samples were selected from the cohort of Undiagnosed Diseases Network (UDN) \citep{ramoni2017} genome sequencing samples that were originally sequenced at HudsonAlpha Institute for Biotechnology (HAIB).  In short, the UDN accepts patients with rare, undiagnosed diseases that are believed to have a genetic origin.  The UDN is not restricted to a particular disease, so there are a diverse set of diseases and phenotypes represented across the whole population.  The phenotypes annotated to a patient are also noisy compared to simulated datasets for a variety of reasons including: 1) some patients have multiple diseases, 2) phenotype collection is done at seven different clinical sites leading to slightly different standards of collection, and 3) some patients exhibit more or fewer phenotypes than are associated with the classic disease presentation.  For more details on the UDN, refer to \citealp{ramoni2017}.  
@@ -97,8 +154,11 @@ As noted earlier, there are generally hundreds of variants per proband that pass
 We split the data into training and test sets on a per-proband basis with the primary goal of roughly balancing the total number of true positives in each set.  Additionally, the cases were assigned to a particular set by chronological order of analysis in order to reduce any chronological biases that may be introduced by expanding scientific knowledge (i.e. there are roughly equal proportions of ``early" or ``late" proband samples from the UDN in each set).  In the training set, there were a total of 189 returned variants and 44593 not returned variants spanning 120 different probands.  In the test set, there were a total of 189 returned variants and 43226 not returned variants spanning 117 different probands.  In our results, the returned test variants are further stratified in their reported levels of pathogenicity.
 
 We then selected four readily available models for classification that are capable of training on imbalanced datasets: a random forest model by {\it sklearn} \citep{pedregosa2011}, a logistic regression model by {\it sklearn}, a balanced random forest model by {\it imblearn} \citep{lemaitre2017}, and an ensemble classification model by {\it imblearn}.  For each model, we selected a list of hyperparameters to test and tested each possible combination of those hyperparameters.  For each model and set of hyperparameters, we performed 10-fold cross validation on the training variants and recorded the balanced accuracy scores (i.e. a weighted accuracy score where inputs are weighted by their inverse class frequency).  For each model type, we saved the hyperparameters and model with the best average balanced accuracy score.  These four tuned models were then tested against the unseen set of test proband cases.
+\ifpreprint
 
+\else
 \end{methods}
+\fi
 
 \section{Results}%mana said results!
 \subsection{Classifier Statistics}
@@ -114,13 +174,27 @@ On the left, we show the false positive rate against the true positive rate.  On
 \label{fig:roc}
 \end{figure*}
 
-For each tuned model, we calculated the 10-fold cross validated balanced accuracy on the training set.  We then calculated the true positive rate (TPR), false positive rate (FPR), and area under the receiver operator curve (AUROC) based on the unseen test data (see Table \ref{tab:classifier_results}.  
+For each tuned model, we calculated the 10-fold cross validated balanced accuracy on the training set.  We then calculated the true positive rate (TPR), false positive rate (FPR), and area under the receiver operator curve (AUROC) based on the unseen test data (see Table \ref{tab:classifier_results}).  
 %The values for each model are shown in Table \ref{tab:classifier_results}.  
 Figure \ref{fig:roc} show receiver operator curves for FPR v. TPR and recall v. precision for the four models.  %Figure \ref{fig:roc} also shows the receiver operator curves for two single-measure statistics (CADD Scaled and HPO-cosine) that are used in the next sections as comparisons for ranking variants.
 
 From these metrics, the two random forest models and the EasyEnsembleClassifier have similar performance whereas whereas LogisticRegression performs slightly worse across the board.  
 %All four classifiers have higher AUROC than either single-measure statistic.  
 However, these classifier all have relatively poor performance from a precision-recall perspective (best AUROC for precision-recall was 0.2109).  This indicates that from a classification perspective, these models would identify a high number of false positives relative to the true positives unless a very conservative cutoff score was used.
+
+\ifpreprint
+\begin{table}[!t]
+\centering
+\begin{tabular}{c|c|c|c|c}
+\hline
+\input{classifier_rendered.tex}
+\hline
+\end{tabular}
+\caption{Classifier performance statistics.  For each tuned classifier, we show performance measures commonly used for classifiers (from left to right): 10-fold cross validation balanced accuracy (CV10 Acc.), true positive rate (TPR), false positive rate (FPR), and area under the receiver operator curve (AUROC). In general, the two random forest methods and the EasyEnsembleClassifier perform very similarly whereas LogisticRegression seems to be slightly worse across all measures.}
+\label{tab:classifier_results}
+\end{table}
+
+\else
 
 \begin{table}[!t]
 \processtable{Classifier performance statistics.  For each tuned classifier, we show performance measures commonly used for classifiers (from left to right): 10-fold cross validation balanced accuracy (CV10 Acc.), true positive rate (TPR), false positive rate (FPR), and area under the receiver operator curve (AUROC). In general, the two random forest methods and the EasyEnsembleClassifier perform very similarly whereas LogisticRegression seems to be slightly worse across all measures. \label{tab:classifier_results}}{
@@ -130,6 +204,26 @@ However, these classifier all have relatively poor performance from a precision-
 \hline
 \end{tabular}}{}
 \end{table}
+\fi
+
+\ifpreprint
+\newgeometry{margin=1cm} % modify this if you need even more space
+\begin{landscape}
+\begin{table}[!t]
+\centering
+\begin{tabular}{c|c|c|c|c||c|c|c|c}
+\hline
+\input{data_rendered.tex}
+\hline
+\end{tabular}
+\caption{Ranking performance statistics.  This table shows the ranking performance statistics for all methods evaluated on our test set.  CADD Scaled and HPO-cosine are single value measures that were used as inputs to the classifiers we tested.  Exomiser is an external tool that only reported ranks for a subset of the filtered variants.  ``Exomiser(best)" conservatively assumed unranked primary variants were ranked at the next best position despite being unranked.  In contrast, ``Exomiser(avg)" realistically assumed unranked primary variants were at the average rank (i.e. middle) for all unranked variants.  The bottom four rows are the tuned, binary classification methods tested in this paper.  The ``Case Rank" columns show the median and mean ranks for all reported variants along with the variants split into their reported pathogenicity (calculated using the ACMG guidelines).  The ``Percentage in Top X Variants" columns show the percentage of variants that were found in the top 1, 10, and 20 variants in a case after ranking by the corresponding method.  All values were generated using only the test data that was unseen during training.}
+\label{tab:performance}
+\end{table}
+\end{landscape}
+\restoregeometry
+\subsection{Ranking Statistics}
+
+\else
 
 \subsection{Ranking Statistics}
 \begin{table*}[!t]
@@ -141,6 +235,7 @@ However, these classifier all have relatively poor performance from a precision-
 \hline
 \end{tabular}}{}%{$^*$Unranked variants were conservatively assumed to be at the next best rank after those that were ranked.}
 \end{table*}
+\fi
 
 In addition to the model performance statistics, we also quantified the performance of each classifier as a ranking system.  For each proband, we calculated the probability of each class (reported or not reported) for each variant and ordered them from highest to lowest probability of being reported.  We then calculated median and mean rank statistics for the reported variants.  Additionally, we quantified the percentage of reported variants that were ranked in the top 1, 10, and 20 variants in each case.  While the models were trained as a binary classification system, we broke down the results further to demonstrate differences between variants that were clinically reported as a variant of uncertain significance (VUS), likely pathogenic, and pathogenic.  
 
@@ -157,6 +252,20 @@ After training and testing each classifier, we wished to explore which features 
 
 Interestingly, the two strongest individual features by far were the phenotype-based measures (HPO-cosine and PyxisMap) making up $\sim$33-40\% of the feature importance.  These were followed by CADD Scaled ($\sim$7-10\%) and three conservation scores ($\sim$14\%).  GnomAD-related fields ($\sim$8\%), GERP rsScore ($\sim$2-3\%), and HGMD-related fields ($\sim$4\%) made up the rest of features with higher than expected importance.  These results would suggest that phenotype-based metrics, deleteriousness scores, and conservation scores are of very high importance for predicting if a variant will be clinically returned to a rare disease patient.
 
+\ifpreprint
+\begin{table}[!t]
+\centering
+\begin{tabular}{l|c|c}
+\hline
+\input{features_rendered.tex}
+\hline
+\end{tabular}
+\caption{Random forest feature importances.  This table shows the top feature importances reported by the two random forest algorithms we tested.  We had exactly 50 features passed into the classifier algorithms, so we show all features with an average importance $\ge 0.02$ indicating a feature utilized more than we would expect by chance.}
+\label{tab:features}
+\end{table}
+
+\else
+
 \begin{table}[!t]
 \processtable{Random forest feature importances.  This table shows the top feature importances reported by the two random forest algorithms we tested.  We had exactly 50 features passed into the classifier algorithms, so we show all features with an average importance $\ge 0.02$ indicating a feature utilized more than we would expect by chance. \label{tab:features}}{
 \begin{tabular}{l|c|c}
@@ -165,6 +274,7 @@ Interestingly, the two strongest individual features by far were the phenotype-b
 \hline
 \end{tabular}}{}
 \end{table}
+\fi
 
 \section{Conclusion}
 We assessed the application of binary classification algorithms for identifying variants that were ultimately reported on a clinical report.  We trained and tested these algorithms using real patient variants and phenotype terms from the standard clinical process obtained from the Undiagnosed Diseases Network (UDN).  From a classification perspective, we found that these methods tend to have low precision scores, meaning a high number of false positives were identified by each method.  However, when evaluated as a ranking system, all four methods out-performed single-measure ranking systems and Exomiser.  We consider the best classifier to be the EasyEnsembleClassifier from {\it imblearn} that had a median rank of 7.0 for all reported variants while ranking 73\% in the top 20 for the case.  For ``Pathogenic" variants, the median rank was 2.0 and 97\% of those variants were ranked in the top 20 for the case.  While these algorithms are not perfect classifiers, their use as a prioritization system is quite promising.
