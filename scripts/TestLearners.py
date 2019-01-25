@@ -627,7 +627,7 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
     resultsDict['TRAINING_MODE'] = ['EXACT_MODE', 'GRID_MODE', 'RANDOM_MODE'][currentMode]
 
     classifiers = [
-        ('RandomForest(sklearn)', RandomForestClassifier(random_state=0, class_weight='balanced', max_depth=4, n_estimators=300, min_samples_split=2, max_features='sqrt'), 
+        ('RandomForest(sklearn)', RandomForestClassifier(random_state=0, class_weight='balanced', max_depth=3, n_estimators=100, min_samples_split=2, max_features='sqrt'), 
         {
             'random_state' : [0],
             'class_weight' : ['balanced'],
@@ -638,7 +638,7 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
         }),
         #('svc_bal', SVC(probability=True, class_weight="balanced")),#this one doesn't scale well past 10k samples
         #('mlp', MLPClassifier()),#this one doesn't work, presumably because there is no balanced option
-        ('LogisticRegression(sklearn)', LogisticRegression(random_state=0, class_weight='balanced', penalty='l2', C=0.01, solver='liblinear', max_iter=200), 
+        ('LogisticRegression(sklearn)', LogisticRegression(random_state=0, class_weight='balanced', penalty='l2', C=10.0, solver='newton-cg', max_iter=200), 
         {
             'random_state' : [0],
             'class_weight' : ['balanced'],
