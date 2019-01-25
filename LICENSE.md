@@ -60,7 +60,7 @@ This License and Terms of Use will be construed, interpreted, and applied in acc
 User agrees to comply with all export and re-export restrictions and regulations of the Department of Commerce or other agency or authority of the United States or other applicable countries, and not to transfer, or authorize the transfer of, VarSight to a prohibited country or otherwise in violation of any such restrictions or regulations. User shall obtain any and all import licenses necessary or proper for the import and use of VarSight, as relevant.
 
 ### 14. Publication/Acknowledgement.   
-User shall acknowledge HudsonAlpha as the provider of VarSight in any publication or presentation using VarSight or any data derived from VarSight.  User shall notify HudsonAlpha of any such publication or presentation within thirty (30) calendar days of public disclosure. User must include `VarSight© 2018 Liz Worthey and Matthew Holt` as the acknowledgement on any publication or presentation.
+User shall acknowledge HudsonAlpha as the provider of VarSight in any publication or presentation using VarSight or any data derived from VarSight.  User shall notify HudsonAlpha of any such publication or presentation within thirty (30) calendar days of public disclosure. User must include `VarSight© 2018 James M. Holt and Elizabeth A. Worthey` as the acknowledgement on any publication or presentation.
 
 ### 15. Notice.  
 Any notices or notifications required by this Agreement shall be sent to: 
