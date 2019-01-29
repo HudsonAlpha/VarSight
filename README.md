@@ -9,4 +9,4 @@ VarSight is a collection of scripts used to test the application of classificati
 
 ## Publications
 
-Forthcoming.
+[Pre-print on bioRxiv: Holt, James M. et al. "VarSight: Prioritizing Clinically Reported Variants with Binary Classification Algorithms."](https://www.biorxiv.org/content/10.1101/532440v1)
