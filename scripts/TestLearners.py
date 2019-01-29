@@ -1197,7 +1197,7 @@ def runAnalysis(args):
         resultsDict = runClassifiers(args, xFinal, yFinal, featureLabels, startIndices, allRepDicts, exomiserRanks)
         
         fp = open(resultJsonFN, 'wt+')
-        json.dump(resultsDict, fp, default=jsonDumpFix)
+        json.dump(resultsDict, fp, default=jsonDumpFix, sort_keys=True, indent=4)
         fp.close()
 
     fp = open(resultJsonFN, 'rt')
