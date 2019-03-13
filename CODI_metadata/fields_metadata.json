@@ -1,5 +1,87 @@
 {
+    "sequencingFields" : [
+        {
+            "key" : "percent reads",
+            "interpret" : "float",
+            "defaultValue" : -1.0
+        },
+        {
+            "key" : "total depth",
+            "interpret" : "float",
+            "defaultValue" : -1.0
+        }
+    ],
     "allelicInformation" : [
+        {
+            "key" : "CADD Scaled",
+            "interpret" : "float",
+            "defaultValue" : -1.0
+        },
+        {
+            "key" : "phylop conservation",
+            "interpret" : "float",
+            "defaultValue" : -30.0
+        },
+        {
+            "key" : "phylop100 conservation",
+            "interpret" : "float",
+            "defaultValue" : -3.0
+        },
+        {
+            "key" : "phastcon100 conservation",
+            "interpret" : "float",
+            "defaultValue" : -1.0
+        },
+        {
+            "key" : "Mappability",
+            "interpret" : "float",
+            "defaultValue" : -1.0
+        },
+        {
+            "key" : "GERP rsScore",
+            "interpret" : "float",
+            "defaultValue" : -13.0
+        },
+        {
+            "key" : "Gnomad Exome AF",
+            "interpret" : "float",
+            "defaultValue" : -1.0
+        },
+        {
+            "key" : "Gnomad Exome Hom alt allele count",
+            "interpret" : "float",
+            "defaultValue" : -1.0
+        },
+        {
+            "key" : "Gnomad Exome Hemi alt allele count",
+            "interpret" : "float",
+            "defaultValue" : -1.0
+        },
+        {
+            "key" : "Gnomad Exome total allele count",
+            "interpret" : "float",
+            "defaultValue" : -1.0
+        },
+        {
+            "key" : "Gnomad Genome AF",
+            "interpret" : "float",
+            "defaultValue" : -1.0
+        },
+        {
+            "key" : "Gnomad Genome Hom alt allele count",
+            "interpret" : "float",
+            "defaultValue" : -1.0
+        },
+        {
+            "key" : "Gnomad Genome Hemi alt allele count",
+            "interpret" : "float",
+            "defaultValue" : -1.0
+        },
+        {
+            "key" : "Gnomad Genome total allele count",
+            "interpret" : "float",
+            "defaultValue" : -1.0
+        },
         {
             "key" : "Type",
             "interpret" : "single",
@@ -65,6 +147,24 @@
     ],
     "genes" : [
         {
+            "key" : "RVIS Score",
+            "interpret" : "float_reduce",
+            "reduceFunction" : "min",
+            "defaultValue" : 10.0
+        },
+        {
+            "key" : "GHIS Score",
+            "interpret" : "float_reduce",
+            "reduceFunction" : "max",
+            "defaultValue" : -10.0
+        },
+        {
+            "key" : "HIS Score",
+            "interpret" : "float_reduce",
+            "reduceFunction" : "max",
+            "defaultValue" : -10.0
+        },
+        {
             "key" : "Essentiality",
             "interpret" : "multiple",
             "accepted" : [
@@ -76,6 +176,18 @@
         }
     ],
     "variantTranscripts" : [
+        {
+            "key" : "ADA Boost Splice Prediction",
+            "interpret" : "float_reduce",
+            "reduceFunction" : "max",
+            "defaultValue" : -1.0
+        },
+        {
+            "key" : "Random Forest Splice Prediction",
+            "interpret" : "float_reduce",
+            "reduceFunction" : "max",
+            "defaultValue" : -1.0
+        },
         {
             "key" : "Meta Svm Prediction",
             "interpret" : "multiple",

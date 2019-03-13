@@ -14,6 +14,8 @@ import CodiDumpUtil
 import ExomiserUtil
 import HPOUtil
 import OntologyUtil
+import PhenGenUtil
+import PVPUtil
 import PyxisMapUtil
 import SummaryDBUtil
 
@@ -23,9 +25,11 @@ from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import auc
+from sklearn.metrics import average_precision_score
 from sklearn.metrics import balanced_accuracy_score
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import f1_score
+from sklearn.metrics import make_scorer
 from sklearn.metrics import precision_recall_curve
 from sklearn.metrics import roc_curve
 from sklearn.model_selection import cross_validate
@@ -120,13 +124,13 @@ def loadFormattedData(args):
     '''
     This function is primarily about loading and formatting data prior to training/testing any classifiers.
     @param args - arguments from the command line
-    @return - tuple (xFinal, yFinal, featureLabels, startIndices, allRepDicts, exomiserRanks)
+    @return - tuple (xFinal, yFinal, featureLabels, startIndices, allRepDicts, externalRanks)
         xFinal - an NxM matrix where N is the number of variants in our test/training set and M is the number of features; contains feature values
         yFinal - an N length array where N is the number of variants in our test/training set; 1 if the variant was reported
         featureLabels - an M length array containing feature labels for our output benefit
         startIndices - a (C+1) length array containing the start indices of variants from an individual case
         allRepDicts - an N length array of None or dictionaries; if a dictionary, it contains data on a returned variant
-        exomiserRanks - a list of lists containing exomiser ranks on a per-case basis; missing values are -1*len(ranked variants)
+        externalRanks - a dictionary where key is a label and value is a list of lists containing exomiser ranks on a per-case basis; missing values are -1*len(ranked variants)
     '''
     pyxisRootDir = '/Users/matt/githubProjects/VarSight/pyxis_ranks_'+PYXIS_DATE
     
@@ -143,8 +147,8 @@ def loadFormattedData(args):
     catLabels = []
     
     #treat all categorical things the same other than where it is sourced from
-    labelBlocks = ['allelicInformation', 'genes', 'variantTranscripts']
-
+    labelBlocks = ['allelicInformation', 'genes', 'sequencingFields', 'variantTranscripts']
+    floatDict = {k : [] for k in labelBlocks}
     for lg in labelBlocks:
         for d in catMeta[lg]:
             #make sure we never get the same category twice (shouldn't happen)
@@ -163,8 +167,21 @@ def loadFormattedData(args):
                     indexDict[d['key']][v.lower()] = i
                 ignoreDict[d['key']] = set([v.lower() for v in d.get('ignored', [])])
                 catLabels += [d['key']+'_'+v for v in sorted(d['accepted'])]
+            elif d['interpret'] == 'float':
+                floatDict[lg].append((d['key'], d['defaultValue']))
+            elif d['interpret'] == 'float_reduce':
+                if d['reduceFunction'] == 'max':
+                    reduceFunc = max
+                elif d['reduceFunction'] == 'min':
+                    reduceFunc = min
+                else:
+                    raise Exception("Unknown reduce function: %s" % (d['reduceFunction'], ))
+                floatDict[lg].append((d['key'], reduceFunc, d['defaultValue']))
+            else:
+                raise Exception("Unknown interpretation: %s" % (d['interpret'], ))
 
     #These are the fields used from CODICEM dumps
+    '''
     floatValues = [
         ('CADD Scaled', -1.0),
         ('phylop conservation', -30.0),
@@ -181,22 +198,29 @@ def loadFormattedData(args):
         ('Gnomad Genome Hemi alt allele count', -1.0),
         ('Gnomad Genome total allele count', -1.0),
     ]
+    '''
+    floatValues = floatDict['allelicInformation']
     fieldsOnly = set([l for l, d in floatValues]) | set([d['key'] for d in catMeta['allelicInformation']])
     
     #(label, reduce function, default)
+    '''
     geneValues = [
         ('RVIS Score', min, 10.0),
         ('GHIS Score', max, -10.0),
         ('HIS Score', max, -10.0)
     ]
+    '''
+    geneValues = floatDict['genes']
     geneFieldsOnly = set([l for l, r, d in geneValues]) | set([d['key'] for d in catMeta['genes']])
     
     #(label, default)
+    '''
     seqValues = [
         ("percent reads", -1.0),
         ("total depth", -1.0)
     ]
-    
+    '''
+    seqValues = floatDict['sequencingFields']
     seqFieldsOnly = set([l for l, d in seqValues]) | set(['chromosome', 'position', 'ref allele', 'alt allele'])
     
     #numerical variant-transcript information
@@ -204,10 +228,13 @@ def loadFormattedData(args):
     #"Random Forest Splice Prediction" - looks like 0-1 with "NA"; TODO: what is good/bad?
 
     #(label, reduce function, default)
+    '''
     transValues = [
         ("ADA Boost Splice Prediction", max, -1.0),
         ("Random Forest Splice Prediction", max, -1.0)
     ]
+    '''
+    transValues = floatDict['variantTranscripts']
     transLabelsOnly = set([l for l, r, d in transValues]) | set([d['key'] for d in catMeta['variantTranscripts']])
 
     #TODO: handle all categorical inputs we care about
@@ -258,6 +285,9 @@ def loadFormattedData(args):
     startIndices = [0]
 
     exomiserRanks = []
+    exomiserHumanRanks = []
+    pvpRanks = []
+    phengenRanks = []
 
     for sl in sorted(caseData.keys()):
         #we only need to load those which actually have a return
@@ -414,6 +444,10 @@ def loadFormattedData(args):
                                     raise Exception("Unexpected key, see above")
                         catData += arr
                         catBreak[fieldKey].append(arr)
+                    elif fieldType == 'float' or fieldType == 'float_reduce':
+                        #these are handled elsewhere, although eventually we should maybe move them for code consistency
+                        #TODO: above comment?
+                        pass
                     else:
                         raise Exception("Unexpected interpretation type: "+fieldType)
 
@@ -442,8 +476,17 @@ def loadFormattedData(args):
             allRepDicts += repDicts
 
             #if we are using this case, load info from exomiser for comparison later
-            exRanks = ExomiserUtil.getTargetRanks(sl, fpCPRA)
+            exRanks = ExomiserUtil.getTargetRanks(sl, fpCPRA, 'hiPhive')
             exomiserRanks.append(exRanks)
+
+            exHum = ExomiserUtil.getTargetRanks(sl, fpCPRA, 'hiPhive_human')
+            exomiserHumanRanks.append(exHum)
+
+            pvpRank = PVPUtil.getTargetRanks(sl, fpCPRA)
+            pvpRanks.append(pvpRank)
+
+            phengenRank = PhenGenUtil.getTargetRanks(sl, fpCPRA)
+            phengenRanks.append(phengenRank)
 
         else:
             print(sl, 'ALL_MISSING', primarySet, foundPrimaries, sep=',')
@@ -510,6 +553,9 @@ def loadFormattedData(args):
                     pcaBlocks.append(pcaCat)
                     featureLabels.append(fieldKey+'-PCA1')
                     featureLabels.append(fieldKey+'-PCA2')
+                elif fieldType == 'float' or fieldType == 'float_reduce':
+                    #TODO: does something need to be moved here for consistency if we refactor code?
+                    pass
                 else:
                     raise Exception('Unexpected fieldType')
         xFinal = np.hstack([vVals]+pcaBlocks)
@@ -519,9 +565,17 @@ def loadFormattedData(args):
     #return the values
     yFinal = np.array(np.hstack(allClassifications), dtype='int64')
 
-    return (xFinal, yFinal, featureLabels, startIndices, allRepDicts, exomiserRanks)
+    externalRankings = {
+        'Exomiser(hiPhive)' : exomiserRanks, 
+        'Exomiser(hiPhive, human only)' : exomiserHumanRanks,
+        'DeepPVP' : pvpRanks,
+        'Phen-Gen' : phengenRanks
+    }
 
-def runClassifiers(args, values, classifications, featureLabels, startIndices, allRepDicts, exomiserRanks):
+    #return (xFinal, yFinal, featureLabels, startIndices, allRepDicts, exomiserRanks)
+    return (xFinal, yFinal, featureLabels, startIndices, allRepDicts, externalRankings)
+
+def runClassifiers(args, values, classifications, featureLabels, startIndices, allRepDicts, externalRanks):
     '''
     @param args - any arguments from the command line argparse can be accessed here
     @param values - a matrix with R rows and C columns, where there are "C" features
@@ -529,7 +583,7 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
     @param featureLabels - C length array containing labels (strings) for the features
     @param startIndices - the startIndices of individual cases in the training set
     @param allRepDicts - a list of dictionaries for variants that were reported; non-reported vars are None
-    @param exomiserRanks - paired exomiser ranks for each case; needs to be split up with train/test; missing values are -1*len(ranked variants)
+    @param externalRanks - a dictionary where key is a label and value is a paired exomiser ranks for each case; needs to be split up with train/test; missing values are -1*len(ranked variants)
     @return resultsDict - a dictionary containing many results we wish to include in a paper
     '''
     resultsDict = {}
@@ -562,14 +616,16 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
         train_indices = [0]
         train_dicts = []
         tpTrain = 0
-        exomiserTrain = []
+        #exomiserTrain = []
+        externalTrain = {k : [] for k in externalRanks.keys()}
 
         testXArray = []
         testYArray = []
         test_indices = [0]
         test_dicts = []
         tpTest = 0
-        exomiserTest = []
+        #exomiserTest = []
+        externalTest = {k : [] for k in externalRanks.keys()}
 
         #ratio of TRAIN:TEST
         invRat = 1.0/TEST_SIZE - 1
@@ -587,7 +643,9 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
                 tpTrain += tpCount
 
                 #we moved the data manipulation down
-                exomiserTrain.append(exomiserRanks[x])
+                #exomiserTrain.append(exomiserRanks[x])
+                for k in externalRanks.keys():
+                    externalTrain[k].append(externalRanks[k][x])
 
             else:
                 #we need more in our test
@@ -598,7 +656,9 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
                 tpTest += tpCount
 
                 #we moved the data manipulation down
-                exomiserTest.append(exomiserRanks[x])
+                #exomiserTest.append(exomiserRanks[x])
+                for k in externalRanks.keys():
+                    externalTest[k].append(externalRanks[k][x])
         
         #join them all together
         train_x = np.vstack(trainXArray)
@@ -684,13 +744,18 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
         #prep this for storing any results later
         resultsDict['CLASSIFIERS'][clf_label] = {}
 
+        scoringMode = 'f1'
+        cv = StratifiedKFold(n_splits=10)
+            
+        #scoringMode = 'balanced_accuracy'
         if currentMode == EXACT_MODE:
             clf = raw_clf
         elif currentMode == GRID_MODE:
             #grid search over hyperparameters
-            clf = GridSearchCV(raw_clf, hyperparam, cv=10, scoring='balanced_accuracy', n_jobs=-1)
+            clf = GridSearchCV(raw_clf, hyperparam, cv=cv, scoring=scoringMode, n_jobs=-1)
+            #clf = GridSearchCV(raw_clf, hyperparam, cv=10, scoring=make_scorer(average_precision_score), n_jobs=-1)
         elif currentMode == RANDOM_MODE:
-            clf = RandomizedSearchCV(raw_clf, hyperparam, cv=10, scoring='balanced_accuracy', n_jobs=-1)
+            clf = RandomizedSearchCV(raw_clf, hyperparam, cv=cv, scoring='balanced_accuracy', n_jobs=-1)
         else:
             raise Exception("Unexpected classifier mode")
         
@@ -733,10 +798,10 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
         print('\tconf_matrix_train', trainConf)
         print('\tconf_matrix_test', testConf)
         resultsDict['CLASSIFIERS'][clf_label]['TRAIN_CONFUSION_MATRIX'] = trainConf
-        resultsDict['CLASSIFIERS'][clf_label]['TRAIN_FPR_RATE'] = trainConf[0, 0] / np.sum(trainConf[0, :])
+        resultsDict['CLASSIFIERS'][clf_label]['TRAIN_FPR_RATE'] = trainConf[0, 1] / np.sum(trainConf[0, :])
         resultsDict['CLASSIFIERS'][clf_label]['TRAIN_TPR_RATE'] = trainConf[1, 1] / np.sum(trainConf[1, :])
         resultsDict['CLASSIFIERS'][clf_label]['TEST_CONFUSION_MATRIX'] = testConf
-        resultsDict['CLASSIFIERS'][clf_label]['TEST_FPR_RATE'] = testConf[0, 0] / np.sum(testConf[0, :])
+        resultsDict['CLASSIFIERS'][clf_label]['TEST_FPR_RATE'] = testConf[0, 1] / np.sum(testConf[0, :])
         resultsDict['CLASSIFIERS'][clf_label]['TEST_TPR_RATE'] = testConf[1, 1] / np.sum(testConf[1, :])
         
         #roc_curve stuff - could be misleading due to imbalance
@@ -812,45 +877,38 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
             for p in pList:
                 resultsDict['TEST_COUNTS'][p] = len(rDict[pDict[p]])
 
-        if currentMode == EXACT_MODE:
-            #cross validation scores
-            cv = StratifiedKFold(n_splits=10)
-            
-            #balanced accuracy - "The balanced accuracy in binary and multiclass classification problems to deal with imbalanced datasets. It is defined as the average of recall obtained on each class."
-            bal_cvs_scores = cross_val_score(clf, train_x, train_y, cv=cv, scoring='balanced_accuracy')
-            print('\tbal_cvs_scores', bal_cvs_scores)
-            print("\tbal_Accuracy: %0.4f (+/- %0.4f)" % (bal_cvs_scores.mean(), bal_cvs_scores.std() * 2))
-            resultsDict['CLASSIFIERS'][clf_label]['CV10_BALANCED_ACCURACY'] = (bal_cvs_scores.mean(), bal_cvs_scores.std() * 2)
-            
-            #TODO: I think we should be using F1 here, only matters if we ever go back to EXACT_MODE for reporting results
-            #f1_weighted - see https://scikit-learn.org/stable/modules/generated/sklearn.metrics.f1_score.html#sklearn.metrics.f1_score
-            f1w_cvs_scores = cross_val_score(clf, train_x, train_y, cv=cv, scoring='f1_weighted')
-            print('\tf1w_cvs_scores', f1w_cvs_scores)
-            print("\tf1w_Accuracy: %0.4f (+/- %0.4f)" % (f1w_cvs_scores.mean(), f1w_cvs_scores.std() * 2))
-            resultsDict['CLASSIFIERS'][clf_label]['CV10_BALANCED_F1_WEIGHTED'] = (f1w_cvs_scores.mean(), f1w_cvs_scores.std() * 2)
-            
-            '''
-            #Might be worth doing this in the future, but not particularly useful right now due to data redundancy
-            import eli5
-            from eli5.sklearn.permutation_importance import PermutationImportance
-            permImp = PermutationImportance(clf, scoring='balanced_accuracy', random_state=0, cv='prefit')
-            permImp.fit(train_x, train_y)
-            explan = eli5.explain_weights(permImp, feature_names=featureLabels)
-            print(eli5.formatters.text.format_as_text(explan))
-            exit()
-            '''
 
-        elif currentMode in [GRID_MODE, RANDOM_MODE]:
-            #CV is already calculated here so we can just dump it out
-            print('\tscoring systems:')
-            means = clf.cv_results_['mean_test_score']
-            stds = clf.cv_results_['std_test_score']
-            for mean, std, params in zip(means, stds, clf.cv_results_['params']):
-                print("\t\t%0.3f (+/-%0.03f) for %r" % (mean, std * 2, params))
-                if params == clf.best_params_:
-                    resultsDict['CLASSIFIERS'][clf_label]['CV10_BALANCED_ACCURACY'] = (mean, std*2)
-            
-            #TODO: do we want anything from these results or do we care?
+        #cross validation scores
+        cv = StratifiedKFold(n_splits=10)
+        
+        if currentMode == EXACT_MODE:
+            cvClf = clf
+        elif currentMode == GRID_MODE or currentMode == RANDOM_MODE:
+            cvClf = clf.best_estimator_
+
+        scoringMethods = ['balanced_accuracy', 'f1']
+        allScores = cross_validate(cvClf, train_x, train_y, cv=cv, scoring=scoringMethods, n_jobs=-1)
+        
+        bal_cvs_scores = allScores['test_balanced_accuracy']
+        print('\tbal_cvs_scores', bal_cvs_scores)
+        print("\tbal_Accuracy: %0.4f (+/- %0.4f)" % (bal_cvs_scores.mean(), bal_cvs_scores.std() * 2))
+        resultsDict['CLASSIFIERS'][clf_label]['CV10_BALANCED_ACCURACY'] = (bal_cvs_scores.mean(), bal_cvs_scores.std() * 2)
+        
+        f1_cvs_scores = allScores['test_f1']
+        print('\tf1_cvs_scores', f1_cvs_scores)
+        print("\tf1_Accuracy: %0.4f (+/- %0.4f)" % (f1_cvs_scores.mean(), f1_cvs_scores.std() * 2))
+        resultsDict['CLASSIFIERS'][clf_label]['CV10_F1'] = (f1_cvs_scores.mean(), f1_cvs_scores.std() * 2)
+        
+        '''
+        #Might be worth doing this in the future, but not particularly useful right now due to data redundancy
+        import eli5
+        from eli5.sklearn.permutation_importance import PermutationImportance
+        permImp = PermutationImportance(clf, scoring='balanced_accuracy', random_state=0, cv='prefit')
+        permImp.fit(train_x, train_y)
+        explan = eli5.explain_weights(permImp, feature_names=featureLabels)
+        print(eli5.formatters.text.format_as_text(explan))
+        exit()
+        '''
             
         print()
     
@@ -932,13 +990,18 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
     
     #now do exomiser stuff
     if CASE_BASED_SPLIT:
-        exomiserDatasets = [
-            'EXOMISER_BEST',
-            'EXOMISER_AVERAGE'
+        externalDatasets = [
+            'Exomiser(hiPhive)', 
+            'Exomiser(hiPhive, human only)',
+            'Phen-Gen',
+            'DeepPVP'
         ]
 
-        for exomiserLabel in exomiserDatasets:
-            resultsDict[exomiserLabel] = {}
+        resultsDict['EXTERNAL'] = {}
+        resultsDict['EXT_LABELS'] = externalDatasets
+
+        for externalLabel in externalDatasets:
+            resultsDict['EXTERNAL'][externalLabel] = {}
             ranks = []
             i = 0
             rp = []
@@ -957,17 +1020,21 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
 
                 #ranks contain the 0-based index, so we need to add one to it for output comparison
                 #ranks += [r+1 for r in exomiserArray[x]]
-                missingArray += [(r < 0) for r in exomiserTest[x]]
-                if exomiserLabel == 'EXOMISER_BEST':
+                #missingArray += [(r < 0) for r in exomiserTest[x]]
+                missingArray += [(r < 0) for r in externalTest[externalLabel][x]]
+                #TODO: remove excess code here
+                if True or externalLabel == 'EXOMISER_BEST':
                     #absolute value, then 1-base it
-                    ranks += [abs(v)+1 for v in exomiserTest[x]]
-                elif exomiserLabel == 'EXOMISER_AVERAGE':
+                    #ranks += [abs(v)+1 for v in exomiserTest[x]]
+                    ranks += [abs(v)+1 for v in externalTest[externalLabel][x]]
+                elif externalLabel == 'EXOMISER_AVERAGE':
                     #average value if missing, then 1-base it
                     #if less than 0, the value is missing SO find the midpoint of unranked values and set the number to that
                     #midpoint calc = (# of variants - #ranked)/2.0 + (rank of highest ranked)
-                    ranks += [v+1 if v >= 0 else ((et-st+v)/2.0-v)+1 for v in exomiserTest[x]]
+                    #ranks += [v+1 if v >= 0 else ((et-st+v)/2.0-v)+1 for v in exomiserTest[x]]
+                    ranks += [v+1 if v >= 0 else ((et-st+v)/2.0-v)+1 for v in externalTest[externalLabel][x]]
                 else:
-                    raise Exception('Unimplemented exomiser output label: '+exomiserLabel)
+                    raise Exception('Unimplemented exomiser output label: '+externalLabel)
 
                 for d in case_d:
                     if d != None:
@@ -987,7 +1054,7 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
             ranks = list(filter(lambda v: v != None, ranks))
             missingCounts = sum(missingArray)
 
-            print(exomiserLabel+':')
+            print(externalLabel+':')
             print('\tNum ranked:', len(ranks))
             print('\tMissing:', missingCounts)
             print('\tRanks:', ranks)
@@ -995,12 +1062,12 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
             print('\tmean:', np.mean(ranks))
             print('\tstdev:', np.std(ranks))
             print('\tmedian:', np.median(ranks))
-            resultsDict[exomiserLabel]['MISSING'] = {}
-            resultsDict[exomiserLabel]['MISSING']['OVERALL'] = missingCounts
-            resultsDict[exomiserLabel]['FOUND'] = {}
-            resultsDict[exomiserLabel]['FOUND']['OVERALL'] = len(ranks)
-            resultsDict[exomiserLabel]['TEST_RANKINGS'] = {}
-            resultsDict[exomiserLabel]['TEST_RANKINGS']['OVERALL'] = ranks
+            resultsDict['EXTERNAL'][externalLabel]['MISSING'] = {}
+            resultsDict['EXTERNAL'][externalLabel]['MISSING']['OVERALL'] = missingCounts
+            resultsDict['EXTERNAL'][externalLabel]['FOUND'] = {}
+            resultsDict['EXTERNAL'][externalLabel]['FOUND']['OVERALL'] = len(ranks)
+            resultsDict['EXTERNAL'][externalLabel]['TEST_RANKINGS'] = {}
+            resultsDict['EXTERNAL'][externalLabel]['TEST_RANKINGS']['OVERALL'] = ranks
 
             for v in pList:
                 missingCounts = rDict[pDict[v]].count(None)
@@ -1011,9 +1078,9 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
                 print('\t\tmean:', np.mean(rDict[pDict[v]]))
                 print('\t\tstdev:', np.std(rDict[pDict[v]]))
                 print('\t\tmedian:', np.median(rDict[pDict[v]]))
-                resultsDict[exomiserLabel]['MISSING'][v] = sum(missingDict[pDict[v]])
-                resultsDict[exomiserLabel]['FOUND'][v] = 'NO_IMPL'
-                resultsDict[exomiserLabel]['TEST_RANKINGS'][v] = rDict[pDict[v]]
+                resultsDict['EXTERNAL'][externalLabel]['MISSING'][v] = sum(missingDict[pDict[v]])
+                resultsDict['EXTERNAL'][externalLabel]['FOUND'][v] = 'NO_IMPL'
+                resultsDict['EXTERNAL'][externalLabel]['TEST_RANKINGS'][v] = rDict[pDict[v]]
 
     #ROC curve
     if args.path_only:
@@ -1193,8 +1260,8 @@ def runAnalysis(args):
     REGENERATE_DATA = args.regenerate
 
     if REGENERATE_DATA or not os.path.exists(resultJsonFN):
-        (xFinal, yFinal, featureLabels, startIndices, allRepDicts, exomiserRanks) = loadFormattedData(args)
-        resultsDict = runClassifiers(args, xFinal, yFinal, featureLabels, startIndices, allRepDicts, exomiserRanks)
+        (xFinal, yFinal, featureLabels, startIndices, allRepDicts, externalRanks) = loadFormattedData(args)
+        resultsDict = runClassifiers(args, xFinal, yFinal, featureLabels, startIndices, allRepDicts, externalRanks)
         
         fp = open(resultJsonFN, 'wt+')
         json.dump(resultsDict, fp, default=jsonDumpFix, sort_keys=True, indent=4)

@@ -5,12 +5,14 @@ This file should contain helper functions to parse and load Exomiser ranking fil
 import json
 import os
 
-def loadAllExomiserRanks(sl):
+def loadAllExomiserRanks(sl, subtype):
     '''
     Loads a .json file from Exomiser
     @param sl - the SL number to load
+    @param subtype - the particular run of exomiser
     '''
-    fn = '/Users/matt/githubProjects/VarSight/exomiser_results/'+sl+'-hiphive-genome-PASS_ONLY.json'
+    #fn = '/Users/matt/githubProjects/VarSight/exomiser_results/'+sl+'-hiphive-genome-PASS_ONLY.json'
+    fn = '/Users/matt/githubProjects/VarSight/exomiser_results_v2/%s-%s.json' % (sl, subtype)
     fp = open(fn, 'rt')
     j = json.load(fp)
     fp.close()
@@ -35,21 +37,34 @@ def loadAllExomiserRanks(sl):
     
     return orderedRet
 
-def getTargetRanks(sl, foundPrimaries):
+def getTargetRanks(sl, foundPrimaries, subtype):
     '''
     Simple utility to load the SL file and find the rank of each primary that Exomiser actually ranked; None for any it didn't
     @param sl - the identifier for the patient
     @param foundPrimaries - list of primaries in tuple form (chrom, position, ref allele, alt allele)
     @return - a list of their 0-based rank from the Exomiser JSON output
     '''
-    fullRanks = loadAllExomiserRanks(sl)
+    fullRanks = loadAllExomiserRanks(sl, subtype)
     ret = []
-    for fp in foundPrimaries:
+    for fpRaw in foundPrimaries:
+        #X is changed to 23 for some reason
+        if fpRaw[0] == 'X':
+            fp = ('23', )+fpRaw[1:]
+        else:
+            fp = fpRaw
+        
         try:
             ind = fullRanks.index(fp)
         except:
             assert(len(fullRanks) != 0)
             ind = -1*len(fullRanks)
+            
+            for fr in fullRanks:
+                print('fr', fr)
+            print('ERROR: missing reported variant in Exomiser output')
+            print('Missing:', fp)
+            raise Exception('See above')
+            
         ret.append(ind)
     return ret
 
