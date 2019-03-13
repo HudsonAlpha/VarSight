@@ -3,84 +3,100 @@
         {
             "key" : "percent reads",
             "interpret" : "float",
-            "defaultValue" : -1.0
+            "defaultValue" : -1.0,
+            "description" : "The percentage of reads containing the alternate allele at a variant site."
         },
         {
             "key" : "total depth",
             "interpret" : "float",
-            "defaultValue" : -1.0
+            "defaultValue" : -1.0,
+            "description" : "The total number of reads covering a variant site."
         }
     ],
     "allelicInformation" : [
         {
             "key" : "CADD Scaled",
             "interpret" : "float",
-            "defaultValue" : -1.0
+            "defaultValue" : -1.0,
+            "description" : "The phred-scaled version of the CADD score that estimates the pathogenicity of a variant in the human genome."
         },
         {
             "key" : "phylop conservation",
             "interpret" : "float",
-            "defaultValue" : -30.0
+            "defaultValue" : -30.0,
+            "description" : "The PhyloP conservation score is a measure of evolutionary conservation at an individual genomic site. This value is the 46-way PhyloP conservation score that uses the alignments of 45 vertebrate species to the human genome."
         },
         {
             "key" : "phylop100 conservation",
             "interpret" : "float",
-            "defaultValue" : -3.0
+            "defaultValue" : -3.0,
+            "description" : "The PhyloP conservation score is a measure of evolutionary conservation at an individual genomic site. This value is the 100-way PhyloP conservation score that uses the alignments of 99 vertebrate species to the human genome."
         },
         {
             "key" : "phastcon100 conservation",
             "interpret" : "float",
-            "defaultValue" : -1.0
+            "defaultValue" : -1.0,
+            "description" : "The PhastCon conservation score is a measure of evolutionary conservation that factors in surrounding nucleotides (as opposed to a single base).  This value is the 100-way PhastCon conservation score that uses the alignments of 99 vertebrate species to the human genome."
         },
         {
             "key" : "Mappability",
             "interpret" : "float",
-            "defaultValue" : -1.0
+            "defaultValue" : -1.0,
+            "description" : "Mappability is a measure of how unique a location in the genome is based on the surrounding 100bp region. Low mappability may cause issues during alignment and lead to false positives/negatives during variant calling."
         },
         {
             "key" : "GERP rsScore",
             "interpret" : "float",
-            "defaultValue" : -13.0
+            "defaultValue" : -13.0,
+            "description" : "The GERP rejected substitutions score identifies sites in the genome that are under some functional constraint measured by the absence of substitutions at the site."
         },
         {
             "key" : "Gnomad Exome AF",
             "interpret" : "float",
-            "defaultValue" : -1.0
+            "defaultValue" : -1.0,
+            "description" : "GnomAD is a population frequency database.  This value corresponds to the allele frequency in the exome portion of the dataset."
         },
         {
             "key" : "Gnomad Exome Hom alt allele count",
             "interpret" : "float",
-            "defaultValue" : -1.0
+            "defaultValue" : -1.0,
+            "description" : "GnomAD is a population frequency database.  This value corresponds to the number of homozygous alternate calls in the exome portion of the dataset."
         },
         {
             "key" : "Gnomad Exome Hemi alt allele count",
             "interpret" : "float",
-            "defaultValue" : -1.0
+            "defaultValue" : -1.0,
+            "description" : "GnomAD is a population frequency database.  This value corresponds to the number of hemizygous alternate calls in the exome portion of the dataset."
         },
         {
             "key" : "Gnomad Exome total allele count",
             "interpret" : "float",
-            "defaultValue" : -1.0
+            "defaultValue" : -1.0,
+            "description" : "GnomAD is a population frequency database.  This value corresponds to the number of alleles called in the exome portion of the dataset."
         },
         {
             "key" : "Gnomad Genome AF",
             "interpret" : "float",
-            "defaultValue" : -1.0
+            "defaultValue" : -1.0,
+            "description" : "GnomAD is a population frequency database.  This value corresponds to the allele frequency in the genome portion of the dataset."
         },
         {
             "key" : "Gnomad Genome Hom alt allele count",
             "interpret" : "float",
-            "defaultValue" : -1.0
+            "defaultValue" : -1.0,
+            "description" : "GnomAD is a population frequency database.  This value corresponds to the number of homozygous alternate calls in the genome portion of the dataset."
         },
         {
             "key" : "Gnomad Genome Hemi alt allele count",
             "interpret" : "float",
-            "defaultValue" : -1.0
+            "defaultValue" : -1.0,
+            "description" : "GnomAD is a population frequency database.  This value corresponds to the number of hemizygous alternate calls in the genome portion of the dataset."
         },
         {
             "key" : "Gnomad Genome total allele count",
             "interpret" : "float",
-            "defaultValue" : -1.0
+            "defaultValue" : -1.0,
+            "description" : "GnomAD is a population frequency database.  This value corresponds to the number of alleles called in the genome portion of the dataset."
         },
         {
             "key" : "Type",
@@ -89,7 +105,8 @@
                 "SNV" : 0,
                 "INSERTION" : 1,
                 "DELETION" : 2
-            }
+            },
+            "description" : "This value stores the type of variant (SNV, insertion, or deletion)."
         },
         {
             "key" : "HGMD assessment type",
@@ -99,7 +116,8 @@
             ],
             "ignored" : [
                 "NA"
-            ]
+            ],
+            "description" : "HGMD is a database storing germline mutations related to human inherited disease. This value corresponds to the assessment of how damaging the mutation was."
         },
         {
             "key" : "HGMD association confidence",
@@ -109,7 +127,8 @@
             ],
             "ignored" : [
                 "NA"
-            ]
+            ],
+            "description" : "HGMD is a database storing germline mutations related to human inherited disease. This value corresponds to how confident the assessment of the mutation was."
         },
         {
             "key" : "ClinVar Classification",
@@ -121,7 +140,8 @@
             ],
             "ignored" : [
                 "", "not provided", "other", "affects", "NA"
-            ]
+            ],
+            "description" : "ClinVar is a database storing relationships between human variation and phenotype. This value corresponds to the classification of how damaging a particular variant was."
         },
         {
             "key" : "Ensembl Regulatory Feature",
@@ -132,7 +152,8 @@
             ],
             "ignored" : [
                 "NA"
-            ]
+            ],
+            "description" : "Ensembl regulatory features contains information regarding if a variant is impacting annotating promoters, enhancers, etc."
         },
         {
             "key" : "variant_attribute",
@@ -142,7 +163,8 @@
             ],
             "ignored" : [
                 "NA"
-            ]
+            ],
+            "description" : "This value contains whether a variant lies in a simple repeat or other low complexity region in the genome."
         }
     ],
     "genes" : [
@@ -150,19 +172,22 @@
             "key" : "RVIS Score",
             "interpret" : "float_reduce",
             "reduceFunction" : "min",
-            "defaultValue" : 10.0
+            "defaultValue" : 10.0,
+            "description" : "The Residual Variation Intolerance Score is a measure of how intolerant to variation a particular gene is in the human genome."
         },
         {
             "key" : "GHIS Score",
             "interpret" : "float_reduce",
             "reduceFunction" : "max",
-            "defaultValue" : -10.0
+            "defaultValue" : -10.0,
+            "description" : "The Genome-wide Haplo-Insufficiency Score is a measure of gene haploinsufficiency calculated in Steinberg et. al, 2015 (\\url{https://doi.org/10.1093/nar/gkv474})."
         },
         {
             "key" : "HIS Score",
             "interpret" : "float_reduce",
             "reduceFunction" : "max",
-            "defaultValue" : -10.0
+            "defaultValue" : -10.0,
+            "description" : "This Haplo-Insufficiency Score is a measure of gene haploinsufficiency calculated in Huang et. al, 2010 (\\url{https://doi.org/10.1371/journal.pgen.1001154})."
         },
         {
             "key" : "Essentiality",
@@ -172,7 +197,8 @@
             ],
             "ignored" : [
                 "NA"
-            ]
+            ],
+            "description" : "Essentiality is a measure of how essential a gene is for humans based on comparison to orthologs in mouse defined in Georgi et. al, 2013 (\\url{https://doi.org/10.1371/journal.pgen.1003484})."
         }
     ],
     "variantTranscripts" : [
@@ -180,13 +206,15 @@
             "key" : "ADA Boost Splice Prediction",
             "interpret" : "float_reduce",
             "reduceFunction" : "max",
-            "defaultValue" : -1.0
+            "defaultValue" : -1.0,
+            "description" : "ADA Boost Splice Prediction is a measure of the impact of a variant on splicing using adaptive boosting from Jian et. al, 2014 (\\url{https://doi.org/10.1093/nar/gku1206})."
         },
         {
             "key" : "Random Forest Splice Prediction",
             "interpret" : "float_reduce",
             "reduceFunction" : "max",
-            "defaultValue" : -1.0
+            "defaultValue" : -1.0,
+            "description" : "Random Forest Splice Prediction is a measure of the impact of a variant on splicing using random forest from Jian et. al, 2014 (\\url{https://doi.org/10.1093/nar/gku1206})."
         },
         {
             "key" : "Meta Svm Prediction",
@@ -196,7 +224,8 @@
             ],
             "ignored" : [
                 "NA"
-            ]
+            ],
+            "description" : "Meta SVM is a method to predict deleteriousness of a variant in a transcript using Support Vector Machines as defined in Dong et. al, 2015 (\\url{https://doi.org/10.1093/hmg/ddu733})."
         },
         {
             "key" : "PolyPhen HV Prediction",
@@ -206,7 +235,8 @@
             ],
             "ignored" : [
                 "NA"
-            ]
+            ],
+            "description" : "PolyPhen predicts the impact of amino acid substitutions on a protein.  This is the PolyPhen2 score based on HumVar as defined in Adzhubei et. al, 2014 (\\url{https://doi.org/10.1002/0471142905.hg0720s76})."
         },
         {
             "key" : "PolyPhen HD Prediction",
@@ -216,7 +246,8 @@
             ],
             "ignored" : [
                 "NA"
-            ]
+            ],
+            "description" : "PolyPhen predicts the impact of amino acid substitutions on a protein.  This is the PolyPhen2 score based on HumDiv as defined in Adzhubei et. al, 2014 (\\url{https://doi.org/10.1002/0471142905.hg0720s76})."
         },
         {
             "key" : "Provean Prediction",
@@ -226,7 +257,8 @@
             ],
             "ignored" : [
                 "NA"
-            ]
+            ],
+            "description" : "PROVEAN (PROtein Variant Effect ANalyzer) predicts where an amino acid substition or indel impacts biological function as defined by Choi, 2012 (\\url{https://doi.org/10.1145/2382936.2382989})."
         },
         {
             "key" : "SIFT Prediction",
@@ -236,7 +268,8 @@
             ],
             "ignored" : [
                 "NA"
-            ]
+            ],
+            "description" : "SIFT predicts whether an amino acid substitution impacts protein function as defined by Kumar et. al, 2009 (\\url{https://doi.org/10.1038/nprot.2009.86})."
         },
         {
             "key" : "Effects",
@@ -249,7 +282,8 @@
             ],
             "ignored" : [
                 "unknown"
-            ]
+            ],
+            "description" : "Effects includes the predicted impact on a transcript such as non-synonymous, possible frameshift, etc."
         },
         {
             "key" : "Affected Regions",
@@ -262,7 +296,8 @@
             ],
             "ignored" : [
                 "N/A"
-            ]
+            ],
+            "description" : "Affected regions includes the regions of a transcript that are impacted by the variant such as interior coding exon, 5' UTR intron, etc."
         }
     ]
 }
