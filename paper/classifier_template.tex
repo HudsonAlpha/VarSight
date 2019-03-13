@@ -1,8 +1,7 @@
-Classifier&CV10 Acc.&TPR&FPR&AUROC \\ \hline
+Classifier&CV10 Acc.&AUROC&AUPRC \\ \hline
 {% for clf_label in CLF_LABELS %}
     {{ clf_label }}&
     {{ '%0.2f+-%0.2f' % (CLASSIFIERS[clf_label].CV10_BALANCED_ACCURACY[0], CLASSIFIERS[clf_label].CV10_BALANCED_ACCURACY[1]) }}&
-    {{ '%0.2f' % CLASSIFIERS[clf_label].TEST_TPR_RATE }}&
-    {{ '%0.2f' % CLASSIFIERS[clf_label].TEST_FPR_RATE }}&
-    {{ '%0.4f' % CLASSIFIERS[clf_label].ROC_AUC }} \\
+    {{ '%0.4f' % CLASSIFIERS[clf_label].ROC_AUC }}&
+    {{ '%0.4f' % CLASSIFIERS[clf_label].PR_AUC }} \\
 {% endfor %}

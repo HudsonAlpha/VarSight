@@ -180,14 +180,14 @@
             "interpret" : "float_reduce",
             "reduceFunction" : "max",
             "defaultValue" : -10.0,
-            "description" : "The Genome-wide Haplo-Insufficiency Score is a measure of gene haploinsufficiency calculated in Steinberg et. al, 2015 (\\url{https://doi.org/10.1093/nar/gkv474})."
+            "description" : "The Genome-wide Haplo-Insufficiency Score is a measure of gene haploinsufficiency calculated in Steinberg et al., 2015 (\\url{https://doi.org/10.1093/nar/gkv474})."
         },
         {
             "key" : "HIS Score",
             "interpret" : "float_reduce",
             "reduceFunction" : "max",
             "defaultValue" : -10.0,
-            "description" : "This Haplo-Insufficiency Score is a measure of gene haploinsufficiency calculated in Huang et. al, 2010 (\\url{https://doi.org/10.1371/journal.pgen.1001154})."
+            "description" : "This Haplo-Insufficiency Score is a measure of gene haploinsufficiency calculated in Huang et al., 2010 (\\url{https://doi.org/10.1371/journal.pgen.1001154})."
         },
         {
             "key" : "Essentiality",
@@ -198,7 +198,7 @@
             "ignored" : [
                 "NA"
             ],
-            "description" : "Essentiality is a measure of how essential a gene is for humans based on comparison to orthologs in mouse defined in Georgi et. al, 2013 (\\url{https://doi.org/10.1371/journal.pgen.1003484})."
+            "description" : "Essentiality is a measure of how essential a gene is for humans based on comparison to orthologs in mouse defined in Georgi et al., 2013 (\\url{https://doi.org/10.1371/journal.pgen.1003484})."
         }
     ],
     "variantTranscripts" : [
@@ -207,14 +207,14 @@
             "interpret" : "float_reduce",
             "reduceFunction" : "max",
             "defaultValue" : -1.0,
-            "description" : "ADA Boost Splice Prediction is a measure of the impact of a variant on splicing using adaptive boosting from Jian et. al, 2014 (\\url{https://doi.org/10.1093/nar/gku1206})."
+            "description" : "ADA Boost Splice Prediction is a measure of the impact of a variant on splicing using adaptive boosting from Jian et al., 2014 (\\url{https://doi.org/10.1093/nar/gku1206})."
         },
         {
             "key" : "Random Forest Splice Prediction",
             "interpret" : "float_reduce",
             "reduceFunction" : "max",
             "defaultValue" : -1.0,
-            "description" : "Random Forest Splice Prediction is a measure of the impact of a variant on splicing using random forest from Jian et. al, 2014 (\\url{https://doi.org/10.1093/nar/gku1206})."
+            "description" : "Random Forest Splice Prediction is a measure of the impact of a variant on splicing using random forest from Jian et al., 2014 (\\url{https://doi.org/10.1093/nar/gku1206})."
         },
         {
             "key" : "Meta Svm Prediction",
@@ -225,7 +225,7 @@
             "ignored" : [
                 "NA"
             ],
-            "description" : "Meta SVM is a method to predict deleteriousness of a variant in a transcript using Support Vector Machines as defined in Dong et. al, 2015 (\\url{https://doi.org/10.1093/hmg/ddu733})."
+            "description" : "Meta SVM is a method to predict deleteriousness of a variant in a transcript using Support Vector Machines as defined in Dong et al., 2015 (\\url{https://doi.org/10.1093/hmg/ddu733})."
         },
         {
             "key" : "PolyPhen HV Prediction",
@@ -236,7 +236,7 @@
             "ignored" : [
                 "NA"
             ],
-            "description" : "PolyPhen predicts the impact of amino acid substitutions on a protein.  This is the PolyPhen2 score based on HumVar as defined in Adzhubei et. al, 2014 (\\url{https://doi.org/10.1002/0471142905.hg0720s76})."
+            "description" : "PolyPhen predicts the impact of amino acid substitutions on a protein.  This is the PolyPhen2 score based on HumVar as defined in Adzhubei et al., 2014 (\\url{https://doi.org/10.1002/0471142905.hg0720s76})."
         },
         {
             "key" : "PolyPhen HD Prediction",
@@ -247,7 +247,7 @@
             "ignored" : [
                 "NA"
             ],
-            "description" : "PolyPhen predicts the impact of amino acid substitutions on a protein.  This is the PolyPhen2 score based on HumDiv as defined in Adzhubei et. al, 2014 (\\url{https://doi.org/10.1002/0471142905.hg0720s76})."
+            "description" : "PolyPhen predicts the impact of amino acid substitutions on a protein.  This is the PolyPhen2 score based on HumDiv as defined in Adzhubei et al., 2014 (\\url{https://doi.org/10.1002/0471142905.hg0720s76})."
         },
         {
             "key" : "Provean Prediction",
@@ -269,7 +269,7 @@
             "ignored" : [
                 "NA"
             ],
-            "description" : "SIFT predicts whether an amino acid substitution impacts protein function as defined by Kumar et. al, 2009 (\\url{https://doi.org/10.1038/nprot.2009.86})."
+            "description" : "SIFT predicts whether an amino acid substitution impacts protein function as defined by Kumar et al., 2009 (\\url{https://doi.org/10.1038/nprot.2009.86})."
         },
         {
             "key" : "Effects",

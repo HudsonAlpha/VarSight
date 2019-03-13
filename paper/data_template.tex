@@ -24,38 +24,24 @@ LP (n={{ TEST_COUNTS.LIKELY_PATHOGENIC }})&Path. (n={{ TEST_COUNTS.PATHOGENIC }}
 {% endfor %}
 \hhline{=|=|=|=|=||=|=|=|=}
 
-Exomiser(best)&
-{% for LEVEL in LEVELS %}
-    {{ '%0.1f (%0.2f)' % (np.median(EXOMISER_BEST.TEST_RANKINGS[LEVEL]), np.mean(EXOMISER_BEST.TEST_RANKINGS[LEVEL])) }}&
+{% for ext_label in EXT_LABELS %}
+    {{ ext_label.replace('_', '\\_') }}&
+    {% for LEVEL in LEVELS %}
+        {{ '%0.1f (%0.2f)' % (np.median(EXTERNAL[ext_label].TEST_RANKINGS[LEVEL]), np.mean(EXTERNAL[ext_label].TEST_RANKINGS[LEVEL])) }}&
+    {% endfor %}
+    {% for LEVEL in LEVELS %}
+        {{ '%d, %d, %d' % 
+            (100.0*np.sum(np.array(EXTERNAL[ext_label].TEST_RANKINGS[LEVEL]) <= 1) / len(EXTERNAL[ext_label].TEST_RANKINGS[LEVEL]),
+            100.0*np.sum(np.array(EXTERNAL[ext_label].TEST_RANKINGS[LEVEL]) <= 10) / len(EXTERNAL[ext_label].TEST_RANKINGS[LEVEL]),
+            100.0*np.sum(np.array(EXTERNAL[ext_label].TEST_RANKINGS[LEVEL]) <= 20) / len(EXTERNAL[ext_label].TEST_RANKINGS[LEVEL]))
+        }}
+        {% if LEVEL != 'PATHOGENIC' %}
+            &
+        {% endif %}
+    {% endfor %}
+    \\
 {% endfor %}
-{% for LEVEL in LEVELS %}
-    {{ '%d, %d, %d' % 
-        (100.0*np.sum(np.array(EXOMISER_BEST.TEST_RANKINGS[LEVEL]) <= 1) / len(EXOMISER_BEST.TEST_RANKINGS[LEVEL]),
-        100.0*np.sum(np.array(EXOMISER_BEST.TEST_RANKINGS[LEVEL]) <= 10) / len(EXOMISER_BEST.TEST_RANKINGS[LEVEL]),
-        100.0*np.sum(np.array(EXOMISER_BEST.TEST_RANKINGS[LEVEL]) <= 20) / len(EXOMISER_BEST.TEST_RANKINGS[LEVEL]))
-    }}
-    {% if LEVEL != 'PATHOGENIC' %}
-        &
-    {% endif %}
-{% endfor %}
-\\
-
-Exomiser(avg)&
-{% for LEVEL in LEVELS %}
-    {{ '%0.1f (%0.2f)' % (np.median(EXOMISER_AVERAGE.TEST_RANKINGS[LEVEL]), np.mean(EXOMISER_AVERAGE.TEST_RANKINGS[LEVEL])) }}&
-{% endfor %}
-{% for LEVEL in LEVELS %}
-    {{ '%d, %d, %d' % 
-        (100.0*np.sum(np.array(EXOMISER_AVERAGE.TEST_RANKINGS[LEVEL]) <= 1) / len(EXOMISER_AVERAGE.TEST_RANKINGS[LEVEL]),
-        100.0*np.sum(np.array(EXOMISER_AVERAGE.TEST_RANKINGS[LEVEL]) <= 10) / len(EXOMISER_AVERAGE.TEST_RANKINGS[LEVEL]),
-        100.0*np.sum(np.array(EXOMISER_AVERAGE.TEST_RANKINGS[LEVEL]) <= 20) / len(EXOMISER_AVERAGE.TEST_RANKINGS[LEVEL]))
-    }}
-    {% if LEVEL != 'PATHOGENIC' %}
-        &
-    {% endif %}
-{% endfor %}
-
-\\ \hhline{=|=|=|=|=||=|=|=|=}
+\hhline{=|=|=|=|=||=|=|=|=}
 
 {% for clf_label in CLF_LABELS %}
     {{ clf_label }}&
