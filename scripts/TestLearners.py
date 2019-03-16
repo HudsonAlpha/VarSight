@@ -23,6 +23,9 @@ from imblearn.ensemble import BalancedRandomForestClassifier, RUSBoostClassifier
 
 from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.feature_selection import SelectKBest
+from sklearn.feature_selection import mutual_info_classif
+from sklearn.feature_selection import RFE
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import auc
 from sklearn.metrics import average_precision_score
@@ -181,93 +184,22 @@ def loadFormattedData(args):
                 raise Exception("Unknown interpretation: %s" % (d['interpret'], ))
 
     #These are the fields used from CODICEM dumps
-    '''
-    floatValues = [
-        ('CADD Scaled', -1.0),
-        ('phylop conservation', -30.0),
-        ('phylop100 conservation', -30.0),
-        ('phastcon100 conservation', -1.0),
-        ('Mappability', -1.0),
-        ('GERP rsScore', -13.0),
-        ('Gnomad Exome AF', -1.0),
-        ('Gnomad Exome Hom alt allele count', -1.0),
-        ('Gnomad Exome Hemi alt allele count', -1.0),
-        ('Gnomad Exome total allele count', -1.0),
-        ('Gnomad Genome AF', -1.0),
-        ('Gnomad Genome Hom alt allele count', -1.0),
-        ('Gnomad Genome Hemi alt allele count', -1.0),
-        ('Gnomad Genome total allele count', -1.0),
-    ]
-    '''
     floatValues = floatDict['allelicInformation']
     fieldsOnly = set([l for l, d in floatValues]) | set([d['key'] for d in catMeta['allelicInformation']])
     
     #(label, reduce function, default)
-    '''
-    geneValues = [
-        ('RVIS Score', min, 10.0),
-        ('GHIS Score', max, -10.0),
-        ('HIS Score', max, -10.0)
-    ]
-    '''
     geneValues = floatDict['genes']
     geneFieldsOnly = set([l for l, r, d in geneValues]) | set([d['key'] for d in catMeta['genes']])
     
     #(label, default)
-    '''
-    seqValues = [
-        ("percent reads", -1.0),
-        ("total depth", -1.0)
-    ]
-    '''
     seqValues = floatDict['sequencingFields']
     seqFieldsOnly = set([l for l, d in seqValues]) | set(['chromosome', 'position', 'ref allele', 'alt allele'])
     
     #numerical variant-transcript information
-    #"ADA Boost Splice Prediction" - looks like 0-1 with "NA" in there; TODO: what is good/bad?
-    #"Random Forest Splice Prediction" - looks like 0-1 with "NA"; TODO: what is good/bad?
-
-    #(label, reduce function, default)
-    '''
-    transValues = [
-        ("ADA Boost Splice Prediction", max, -1.0),
-        ("Random Forest Splice Prediction", max, -1.0)
-    ]
-    '''
     transValues = floatDict['variantTranscripts']
     transLabelsOnly = set([l for l, r, d in transValues]) | set([d['key'] for d in catMeta['variantTranscripts']])
 
-    #TODO: handle all categorical inputs we care about
-    #possible good way(s) to do it: https://blog.myyellowroad.com/using-categorical-data-in-machine-learning-with-python-from-dummy-variables-to-deep-category-66041f734512
-    #OHE - one-hot encoding (aka, each term is a bit)
-    #feature hashing method, looks built in to sklearn
-
-    #categorical allelicInformation
-    #"Ensembl Regulatory Feature" - could be broken in ~6 boolean variables since each is a combination of categories
-    #"Type" - 3 categories: SNV, INSERTION, DELETION
-    #"HGMD association confidence" - list of comma-separated "High" or "Low"; also "NA" if nothing is there
-    #"HGMD assessment type" - list of comma-separated "DFP", "DM", "FP", "DP" ("R" and "DM?" might show up FYI);
-    #    after reading paper it looks like this: DM > DFP > DP > FP
-    #"ClinVar Classification" - has many categories (https://www.ncbi.nlm.nih.gov/clinvar/docs/clinsig/), but I think we only care about B, LB, V, LP, and P
-    #    conflicting is another category that we should figure out how to interpret
-    #"variant_attribute" - "Low Complexity Region", "NA", or "Simple Repeat"; might be worth including
-    #CHECKED: this seems to not be in my files; "protein_alt" - looks boolean, "Protein Altering" or "NA"
-    
-    #categorical gene information
-    #"Essentiality" - "Essential", "NA", "Neutral", and "Non-essential"; can likely be a bucket since there are possibly multiple genes
-    #TODO: OMIM and HGMD disease IDs - could be distilled into a count, do we care about these?
-
-    #categorical variant-transcript information
-    #"Meta Svm Prediction" - "D", "T", and "NA"; D = damaging, T = tolerated
-    #"PolyPhen HV Prediction" - "B", "D", "P", and "NA"; D - probably damaging, P - possibly damaging, B - benign
-    #"PolyPhen HD Prediction" - same categories as above
-    #"Provean Prediction" - "D", "N", and "NA"; D - damaging, N - neutral
-    #"SIFT Prediction" - "D", "T", and "NA"; D - damaging, T - tolerated
-    #"Effects" - multiple categories (example: "AA Deletion", "Intergenic", etc.); seems to break LogReg when we added this
-    #"Affected Regions" - multiple categories (example: "3' Coding Exon", "3' UTR intron", etc.), do we want this or not?
-    
     #we need the altIDMap - not sure we actually need it here since the HPO query was done beforehand, but I suppose it doesn't hurt
-    #node, edges, altIDMap = PyxisMapUtil.loadGraphStructure()
     ontFN = '/Users/matt/githubProjects/LayeredGraph/HPO_graph_data/hp.obo'
     nodes, edges, parents, altIDMap = OntologyUtil.loadGraphStructure(ontFN)
     
@@ -497,7 +429,7 @@ def loadFormattedData(args):
     OHE_MODE = 0 #categories are given *-hot encodings where * is the count of how many times that label appears
     PCA_MODE = 1 #all categories are PCA-ed together and the top X PCA components are used
     PCA_BREAK_MODE = 2 #each category has its own PCA, only X PCA components are allowed per category
-    currentCatMode = PCA_BREAK_MODE
+    currentCatMode = OHE_MODE#PCA_BREAK_MODE
 
     featureLabels = (['PyxisMap', 'HPO-cosine']+
         [l for l, d in floatValues]+
@@ -666,6 +598,26 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
         test_x = np.vstack(testXArray)
         test_y = np.hstack(testYArray)
 
+        '''
+        TODO: do we care about this? seems to make most results worse overall and doesn't seem very systematic; we
+        should do some pruning in the long run, but it seems like each method will benefit from a different type
+        (or maybe amount) of pruning.  I think leave it out for now unless this becomes a deal-breaker with some
+        ornery reviewer.
+        '''
+        #'''
+        #more details here: https://scikit-learn.org/stable/modules/feature_selection.html
+        #doing this seems to help with LogisticRegression only, but doesn't bring it up to our current results
+        #select the best parameters based on training only
+        skb = SelectKBest(k=20)
+        skb.fit(train_x, train_y)
+        selected = skb.get_support(False)
+        selected2 = skb.get_support(True)
+        train_x = train_x[:, selected]
+        test_x = test_x[:, selected]
+        featureLabels = [featureLabels[x] for x in selected2]
+        resultsDict['FEATURE_LABELS'] = featureLabels
+        #'''
+
     else:
         #train without any regards to case labels
         train_x, test_x, train_y, test_y = train_test_split(values, classifications, test_size=TEST_SIZE, stratify=classifications)
@@ -766,6 +718,7 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
         elif currentMode in [GRID_MODE, RANDOM_MODE]:
             print('\tBest params:', clf.best_params_)
             resultsDict['CLASSIFIERS'][clf_label]['BEST_PARAMS'] = clf.best_params_
+            resultsDict['CLASSIFIERS'][clf_label]['HYPERPARAMETER_SPACE'] = hyperparam
 
         try:
             print('\tfeature_important:')#, clf.best_estimator_.feature_importances_)
@@ -1164,6 +1117,10 @@ def generateLaTeXResult(args, d):
         classifierFN = rootPath+'/classifier_rendered.tex'
         featuresFN = rootPath+'/features_rendered.tex'
 
+    #this is independent of args
+    featureDescFN = rootPath+'/supplements/feature_info_rendered.tex'
+    hyperFN = rootPath+'/supplements/hyperparameter_rendered.tex'
+
     #this is the main data template
     template = env.get_template('data_template.tex')
     rendered = template.render(d)
@@ -1202,6 +1159,35 @@ def generateLaTeXResult(args, d):
     template = env.get_template('features_template.tex')
     rendered = template.render(featDict)
     fp = open(featuresFN, 'wt+')
+    fp.write(rendered)
+    fp.close()
+
+    #feature description table - supplements
+    metaFN = '/Users/matt/githubProjects/VarSight/CODI_metadata/fields_metadata.json'
+    fp = open(metaFN, 'rt')
+    catMeta = json.load(fp)
+    fp.close()
+    annotKeys = {
+        'sequencingFields' : 'variant',
+        'allelicInformation' : 'variant',
+        'genes' : 'gene',
+        'variantTranscripts' : 'transcript'
+    }
+    tempDict = {
+        'DATA' : catMeta,
+        'KEYS' : annotKeys
+    }
+    template = env.get_template('supplements/feature_info_template.tex')
+    rendered = template.render(tempDict)
+    fp = open(featureDescFN, 'wt+')
+    fp.write(rendered)
+    fp.close()
+
+    #hyperparameter table - supplements
+    d['len'] = len
+    template = env.get_template('supplements/hyperparameter_template.tex')
+    rendered = template.render(d)
+    fp = open(hyperFN, 'wt+')
     fp.write(rendered)
     fp.close()
 
