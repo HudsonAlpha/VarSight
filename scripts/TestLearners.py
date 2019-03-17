@@ -8,6 +8,7 @@ import json
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import pickle
 import re
 
 import CodiDumpUtil
@@ -130,6 +131,7 @@ def loadFormattedData(args):
     @return - tuple (xFinal, yFinal, featureLabels, startIndices, allRepDicts, externalRanks)
         xFinal - an NxM matrix where N is the number of variants in our test/training set and M is the number of features; contains feature values
         yFinal - an N length array where N is the number of variants in our test/training set; 1 if the variant was reported
+        catMeta - the categorical metadata 
         featureLabels - an M length array containing feature labels for our output benefit
         startIndices - a (C+1) length array containing the start indices of variants from an individual case
         allRepDicts - an N length array of None or dictionaries; if a dictionary, it contains data on a returned variant
@@ -137,67 +139,11 @@ def loadFormattedData(args):
     '''
     pyxisRootDir = '/Users/matt/githubProjects/VarSight/pyxis_ranks_'+PYXIS_DATE
     
-    #load the categorical metadata
+    #load the feature metadata
     metaFN = '/Users/matt/githubProjects/VarSight/CODI_metadata/fields_metadata.json'
     fp = open(metaFN, 'rt')
     catMeta = json.load(fp)
     fp.close()
-
-    #build some lookup dicts
-    indexDict = {}
-    indexLen = {}
-    ignoreDict = {}
-    catLabels = []
-    
-    #treat all categorical things the same other than where it is sourced from
-    labelBlocks = ['allelicInformation', 'genes', 'sequencingFields', 'variantTranscripts']
-    floatDict = {k : [] for k in labelBlocks}
-    for lg in labelBlocks:
-        for d in catMeta[lg]:
-            #make sure we never get the same category twice (shouldn't happen)
-            assert(d['key'] not in indexDict)
-
-            if d['interpret'] == 'single':
-                #singles are easy
-                catLabels.append(d['key'])
-            elif d['interpret'] == 'multiple':
-                #multiples, store the number of possiblities in indexLen and the index in indexDict
-                indexDict[d['key']] = {}
-                indexLen[d['key']] = len(d['accepted'])
-                for i, v in enumerate(sorted(d['accepted'])):
-                    #we are .lower()-ing everything, make sure that doesn't introduce a conflict
-                    assert(v not in indexDict[d['key']])
-                    indexDict[d['key']][v.lower()] = i
-                ignoreDict[d['key']] = set([v.lower() for v in d.get('ignored', [])])
-                catLabels += [d['key']+'_'+v for v in sorted(d['accepted'])]
-            elif d['interpret'] == 'float':
-                floatDict[lg].append((d['key'], d['defaultValue']))
-            elif d['interpret'] == 'float_reduce':
-                if d['reduceFunction'] == 'max':
-                    reduceFunc = max
-                elif d['reduceFunction'] == 'min':
-                    reduceFunc = min
-                else:
-                    raise Exception("Unknown reduce function: %s" % (d['reduceFunction'], ))
-                floatDict[lg].append((d['key'], reduceFunc, d['defaultValue']))
-            else:
-                raise Exception("Unknown interpretation: %s" % (d['interpret'], ))
-
-    #These are the fields used from CODICEM dumps
-    floatValues = floatDict['allelicInformation']
-    fieldsOnly = set([l for l, d in floatValues]) | set([d['key'] for d in catMeta['allelicInformation']])
-    
-    #(label, reduce function, default)
-    geneValues = floatDict['genes']
-    geneFieldsOnly = set([l for l, r, d in geneValues]) | set([d['key'] for d in catMeta['genes']])
-    
-    #(label, default)
-    seqValues = floatDict['sequencingFields']
-    seqFieldsOnly = set([l for l, d in seqValues]) | set(['chromosome', 'position', 'ref allele', 'alt allele'])
-    
-    #numerical variant-transcript information
-    transValues = floatDict['variantTranscripts']
-    transLabelsOnly = set([l for l, r, d in transValues]) | set([d['key'] for d in catMeta['variantTranscripts']])
 
     #we need the altIDMap - not sure we actually need it here since the HPO query was done beforehand, but I suppose it doesn't hurt
     ontFN = '/Users/matt/githubProjects/LayeredGraph/HPO_graph_data/hp.obo'
@@ -238,11 +184,17 @@ def loadFormattedData(args):
         assert(len(primaryDict) == len(caseData[sl]['primaries']))
         
         #if there is no CODICEM dump, we obviously can't do anything either
-        codiDump = CodiDumpUtil.loadCodiDump(sl, fieldsOnly, geneFieldsOnly, seqFieldsOnly, transLabelsOnly)
-        if len(codiDump) == 0:
-            print(sl, 'NO_CODICEM_DUMP', sep=',')
-            continue
+        #codiDump = CodiDumpUtil.loadCodiDump(sl, fieldsOnly, geneFieldsOnly, seqFieldsOnly, transLabelsOnly)
+        #if len(codiDump) == 0:
+        #    print(sl, 'NO_CODICEM_DUMP', sep=',')
+        #    continue
         
+        #make sure the codi dump exists
+        codiDumpFN = '/Users/matt/githubProjects/VarSight/CLI_primary_V6/'+sl+'_results.json'
+        if not os.path.exists(codiDumpFN):
+            #print('Missing file: '+fn)
+            continue
+
         #finally, make sure we have a PyxisMap dump we can use
         pyxisFN = pyxisRootDir+'/'+sl+'_pyxis.json'
         if not os.path.exists(pyxisFN):
@@ -270,22 +222,15 @@ def loadFormattedData(args):
         hpoRanks = hpoJson['ranks']
         hpoLen = hpoJson['rankLen']
         
-        #now, we have all the pieces, put them together into tests
-        values = []
-        catValues = []
-        catBreak = {}
+        (labelBlocks, values, catValues, featureLabels, catLabels, catBreak, codiDump) = CodiDumpUtil.prepDataShared(catMeta, codiDumpFN, pyxisRanks, pyxisLen, hpoRanks, hpoLen)
+        
+        #parse primary stuff
         classifications = []
         repDicts = []
-        
-        #print('Primary set: ', primarySet)
         foundPrimaries = set([])
         fpCPRA = []
         
-        #go through each variant now and format the inputs to be seen by a classifier
         for variant in codiDump:
-            vData = []
-            catData = []
-            
             #determine whether this variant is primary or not
             vName = variant['variant'].replace('Chr', 'chr')
             isPrimary = (1.0 if (vName in primarySet) else 0.0)
@@ -298,99 +243,8 @@ def loadFormattedData(args):
             else:
                 repDicts.append(None)
             
-            #first, add in the best PyxisMap rank
-            geneList = variant['genes']
-            pyxisBest = min([pyxisRanks.get(g, (pyxisLen+1, 0.0))[0] / pyxisLen for g in geneList])
-            vData.append(pyxisBest)
-            
-            #now, add the best HPOUtil rank
-            hpoBest = min([hpoRanks.get(g, (hpoLen+1, 0.0))[0] / hpoLen for g in geneList])
-            vData.append(hpoBest)
-            
-            #now add all float values from CODICEM
-            for fvl, invalidValue in floatValues:
-                if variant[fvl] == 'NA':
-                    vData.append(invalidValue)
-                else:
-                    vData.append(float(variant[fvl]))
-
-            #add things from the gene values
-            for gvl, reduceFunc, invalidValue in geneValues:
-                bestVal = reduceFunc([float(v) if v != 'NA' else invalidValue for v in variant[gvl]])
-                vData.append(bestVal)
-            
-            #add things from the seq values
-            for svl, invalidValue in seqValues:
-                if variant[svl] == 'NA':
-                    vData.append(invalidValue)
-                else:
-                    vData.append(float(variant[svl]))
-            
-            #add things from the transcript values
-            for tvl, reduceFunc, invalidValue in transValues:
-                bestVal = reduceFunc([float(v) if v != 'NA' else invalidValue for v in variant[tvl]])
-                vData.append(bestVal)
-
-            #add categorical information as described by "fields_metadata.json"
-            for lg in labelBlocks:
-                for cDict in catMeta[lg]:
-                    fieldKey = cDict['key']
-                    fieldType = cDict['interpret']
-                    if fieldKey not in catBreak:
-                        catBreak[fieldKey] = []
-
-                    if fieldType == 'single':
-                        #singles - add a single float value corresponding to the dictionary lookup in the JSON
-                        fieldDict = cDict['values']
-                        catData.append(float(fieldDict[variant[fieldKey]]))
-                        catBreak[fieldKey].append(float(fieldDict[variant[fieldKey]]))
-                    elif fieldType == 'multiple':
-                        #multiple - create a bin for each category, the array values are bincounts
-                        arr = [0.0]*indexLen[fieldKey]
-                        if fieldKey in ["ClinVar Classification"]:
-                            #split on comma or '/'
-                            csvVals = re.split('[,/]', variant[fieldKey].lower())
-                        elif fieldKey in ["Ensembl Regulatory Feature"]:
-                            #allow missing values here
-                            csvVals = variant.get(fieldKey, 'NA').lower().split(';')
-                        elif type(variant[fieldKey]) == list:
-                            if fieldKey in ["Effects", "Affected Regions"]:
-                                #list of CSV values
-                                csvVals = []
-                                for vfk in variant[fieldKey]:
-                                    csvVals += vfk.lower().split(',')
-                            else:
-                                #we just need to lower it down
-                                csvVals = [vfk.lower() for vfk in variant[fieldKey]]
-                        else:
-                            #split on commas only
-                            csvVals = variant[fieldKey].lower().split(',')
-                        
-                        for v in csvVals:
-                            #remove white space around the values
-                            if (v.strip() not in ignoreDict[fieldKey]):
-                                try:
-                                    arr[indexDict[fieldKey][v.strip()]] += 1
-                                except:
-                                    print(variant[fieldKey], csvVals)
-                                    raise Exception("Unexpected key, see above")
-                        catData += arr
-                        catBreak[fieldKey].append(arr)
-                    elif fieldType == 'float' or fieldType == 'float_reduce':
-                        #these are handled elsewhere, although eventually we should maybe move them for code consistency
-                        #TODO: above comment?
-                        pass
-                    else:
-                        raise Exception("Unexpected interpretation type: "+fieldType)
-
-            #uncomment to see each variant's info
-            #print(vName, isPrimary, vData, sep='\t')
-            
-            #we add all values to our lists for the case
-            values.append(vData)
-            catValues.append(catData)
             classifications.append(isPrimary)
-        
+
         #occasionally primaries are missing, could be filter change OR from some targeted search by an analyst
         if sum(classifications) != len(primarySet):
             print(sl, 'SOME_MISSING', primarySet, foundPrimaries, sep=',')
@@ -430,13 +284,6 @@ def loadFormattedData(args):
     PCA_MODE = 1 #all categories are PCA-ed together and the top X PCA components are used
     PCA_BREAK_MODE = 2 #each category has its own PCA, only X PCA components are allowed per category
     currentCatMode = OHE_MODE#PCA_BREAK_MODE
-
-    featureLabels = (['PyxisMap', 'HPO-cosine']+
-        [l for l, d in floatValues]+
-        [l for l, r, d in geneValues]+
-        [l for l, d in seqValues]+
-        [l for l, r, d in transValues]
-    )
 
     if currentCatMode == OHE_MODE:
         #basic *-hot encoding mode, this was our default originally
@@ -504,8 +351,7 @@ def loadFormattedData(args):
         'Phen-Gen' : phengenRanks
     }
 
-    #return (xFinal, yFinal, featureLabels, startIndices, allRepDicts, exomiserRanks)
-    return (xFinal, yFinal, featureLabels, startIndices, allRepDicts, externalRankings)
+    return (xFinal, yFinal, catMeta, featureLabels, startIndices, allRepDicts, externalRankings)
 
 def runClassifiers(args, values, classifications, featureLabels, startIndices, allRepDicts, externalRanks):
     '''
@@ -516,8 +362,11 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
     @param startIndices - the startIndices of individual cases in the training set
     @param allRepDicts - a list of dictionaries for variants that were reported; non-reported vars are None
     @param externalRanks - a dictionary where key is a label and value is a paired exomiser ranks for each case; needs to be split up with train/test; missing values are -1*len(ranked variants)
-    @return resultsDict - a dictionary containing many results we wish to include in a paper
+    @return tuple
+        resultsDict - a dictionary containing many results we wish to include in a paper
+        trainedClassifierResults - a dictionary containing the models and features
     '''
+    #TODO: I should consider ways to break this function apart; for sanity if nothing else
     resultsDict = {}
     resultsDict['FEATURE_LABELS'] = featureLabels
     print('Values:', values.shape)
@@ -688,6 +537,11 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
     #uncomment to short circuit
     #classifiers = []
 
+    trainedClassifierResults = {
+        'FEATURES' : featureLabels,
+        'MODELS' : {}
+    }
+
     for clf_label, raw_clf, hyperparam in classifiers:
         #test the classifier?
         print(clf_label)
@@ -764,8 +618,6 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
         aucs.append(roc_auc)
         rocs.append((false_positive_rate, true_positive_rate))
         print('\troc_auc', roc_auc)
-        #resultsDict['CLASSIFIERS'][clf_label]['FALSE_POSITIVE_RATE_CURVES'] = false_positive_rate
-        #resultsDict['CLASSIFIERS'][clf_label]['TRUE_POSITIVE_RATE_CURVES'] = true_positive_rate
         resultsDict['CLASSIFIERS'][clf_label]['ROC_AUC'] = roc_auc
         
         #precision-recall curve stuff - should be less misleading
@@ -774,8 +626,6 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
         pr_aucs.append(pr_auc)
         prs.append((recall, precision))
         print('\tpr_auc', pr_auc)
-        #resultsDict['CLASSIFIERS'][clf_label]['PRECISION_CURVES'] = precision
-        #resultsDict['CLASSIFIERS'][clf_label]['RECALL_CURVES'] = recall
         resultsDict['CLASSIFIERS'][clf_label]['PR_AUC'] = pr_auc
         
         if CASE_BASED_SPLIT:
@@ -838,6 +688,9 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
             cvClf = clf
         elif currentMode == GRID_MODE or currentMode == RANDOM_MODE:
             cvClf = clf.best_estimator_
+
+        #save the model in this dictionary for storage
+        trainedClassifierResults['MODELS'][clf_label] = cvClf
 
         scoringMethods = ['balanced_accuracy', 'f1']
         allScores = cross_validate(cvClf, train_x, train_y, cv=cv, scoring=scoringMethods, n_jobs=-1)
@@ -1084,7 +937,7 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
     plt.savefig(plotFN)
     plt.close()
 
-    return resultsDict
+    return (resultsDict, trainedClassifierResults)
 
 def jsonDumpFix(o):
     '''
@@ -1191,66 +1044,29 @@ def generateLaTeXResult(args, d):
     fp.write(rendered)
     fp.close()
 
-def generateViolinPlots(d):
-    '''
-    This function takes the results and makes some ranked violion plots for us
-    TODO: doesn't seem particularly helpful right now, the plot doesn't visually stratify enough; anything we can do about that?
-    '''
-    #create a violin plot stacking all the types
-    plotFN = '/Users/matt/githubProjects/VarSight/paper/violin_ranks.png'
-    plt.figure()
-    
-    overall = []
-    vus = []
-    lp = []
-    p = []
-    for clf_label in d['CLF_LABELS']:
-        overall.append(d['CLASSIFIERS'][clf_label]['TEST_RANKINGS']['OVERALL'])
-        vus.append(d['CLASSIFIERS'][clf_label]['TEST_RANKINGS']['VARIANT_OF_UNCERTAIN_SIGNIFICANCE'])
-        lp.append(d['CLASSIFIERS'][clf_label]['TEST_RANKINGS']['LIKELY_PATHOGENIC'])
-        p.append(d['CLASSIFIERS'][clf_label]['TEST_RANKINGS']['PATHOGENIC'])
-    
-    for cs_label in d['CS_LABELS']:
-        overall.append(d['COMPARISON'][cs_label]['TEST_RANKINGS']['OVERALL'])
-        vus.append(d['COMPARISON'][cs_label]['TEST_RANKINGS']['VARIANT_OF_UNCERTAIN_SIGNIFICANCE'])
-        lp.append(d['COMPARISON'][cs_label]['TEST_RANKINGS']['LIKELY_PATHOGENIC'])
-        p.append(d['COMPARISON'][cs_label]['TEST_RANKINGS']['PATHOGENIC'])
-
-    #for i, (label2, raw_clf, raw_params) in enumerate(classifiers):
-    #    plt.plot(prs[i][0], prs[i][1], label=('%s (%0.4f)' % (label2, pr_aucs[i])))
-    
-    #for i, label2 in enumerate(comparedScores):
-    #    plt.plot(csPrs[i][0], csPrs[i][1], label=('%s (%0.4f)' % (label2, csPrAucs[i])))
-    
-    #plt.xlabel('Recall')
-    #plt.ylabel('Precision')
-    #plt.title('PR curve - all data')
-    plt.violinplot(overall)
-    #plt.violinplot(vus)
-    #plt.violinplot(lp)
-    #plt.violinplot(p)
-    #plt.legend(loc='best')
-    #plt.yscale('log')
-    plt.grid()
-    plt.savefig(plotFN)
-    plt.close()
-
 def runAnalysis(args):
     '''
     Core function for joining our pieces together
     '''
     if args.path_only:
         resultJsonFN = '/Users/matt/githubProjects/VarSight/paper/results_path_only.json'
+        modelPickleFN = '/Users/matt/githubProjects/VarSight/models/VarSight_path_only.p'
     else:
         resultJsonFN = '/Users/matt/githubProjects/VarSight/paper/results.json'
+        modelPickleFN = '/Users/matt/githubProjects/VarSight/models/VarSight.p'
     REGENERATE_DATA = args.regenerate
 
     if REGENERATE_DATA or not os.path.exists(resultJsonFN):
-        (xFinal, yFinal, featureLabels, startIndices, allRepDicts, externalRanks) = loadFormattedData(args)
-        resultsDict = runClassifiers(args, xFinal, yFinal, featureLabels, startIndices, allRepDicts, externalRanks)
-        
-        fp = open(resultJsonFN, 'wt+')
+        (xFinal, yFinal, catMeta, featureLabels, startIndices, allRepDicts, externalRanks) = loadFormattedData(args)
+        resultsDict, trainedModelDict = runClassifiers(args, xFinal, yFinal, featureLabels, startIndices, allRepDicts, externalRanks)
+        trainedModelDict['CATEGORICAL_METADATA'] = catMeta
+
+        fp = open(resultJsonFN, 'w+')
         json.dump(resultsDict, fp, default=jsonDumpFix, sort_keys=True, indent=4)
+        fp.close()
+
+        fp = open(modelPickleFN, 'wb+')
+        pickle.dump(trainedModelDict, fp)
         fp.close()
 
     fp = open(resultJsonFN, 'rt')
@@ -1270,7 +1086,6 @@ def runAnalysis(args):
         resultsDict['len'] = len
         resultsDict['LEVELS'] = ['OVERALL', 'VARIANT_OF_UNCERTAIN_SIGNIFICANCE', 'LIKELY_PATHOGENIC', 'PATHOGENIC']
         generateLaTeXResult(args, resultsDict)
-        generateViolinPlots(resultsDict)
 
 if __name__ == '__main__':
     p = ap.ArgumentParser(description='script for running analysis for VarSight', formatter_class=ap.RawTextHelpFormatter)

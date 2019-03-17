@@ -7,7 +7,7 @@ import requests
 
 import pronto
 
-def getPyxisMapResults(hpoTerms):
+def getPyxisMapResults(hpoTerms, pyxisRoot='http://0.0.0.0:4999'):
     '''
     This function hits the PyxisMap /rank endpoint to get a single ranking of the genes
     @param hpoTerms - a set of core HPO terms of interest
@@ -16,7 +16,7 @@ def getPyxisMapResults(hpoTerms):
         number of genes ranked
     '''
     #TODO: make this URL configurable?
-    pyxisURL = 'http://0.0.0.0:4999/rank'
+    pyxisURL = pyxisRoot+'/rank'
     headers = {'Content-type': 'application/json'}
     data_json = json.dumps(sorted(hpoTerms))
     
