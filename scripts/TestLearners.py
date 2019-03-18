@@ -992,7 +992,7 @@ def generateLaTeXResult(args, d):
     orderedFeatures = []
     classWithFeat = ['RandomForest(sklearn)', 'BalancedRandomForest(imblearn)']
     shortClassNames = ['RF(sklearn)', 'BRF(imblearn)']
-    CUTOFF_IMPORTANCE = 0.02
+    CUTOFF_IMPORTANCE = 0.00
     assert(len(classWithFeat) == len(shortClassNames))
     for i, label in enumerate(d['FEATURE_LABELS']):
         orderedFeatures.append(np.mean([d['CLASSIFIERS'][c]['FEATURE_IMPORTANCE'][i] for c in classWithFeat]))

@@ -1,6 +1,9 @@
 \documentclass{article}
 \usepackage{graphicx}
+\usepackage{longtable}
+\usepackage{multirow}
 \usepackage{rotating}
+\usepackage{url}
 
 \begin{document}
 
@@ -11,7 +14,106 @@
 
 \tableofcontents
 
-\section{Filtering}
+\section{Model Features}
+\subsection{Overview}
+There are a total of 50 features used as inputs to the models.  Two of those features are phenotype-based features and the remaining 48 are derived from Codicem (\url{http://envisiongenomics.com/codicem-analysis-platform/}) extractions.
+
+\subsection{Phenotype Features}
+For both methods, we relied on annotations and ontological structures provided by the Human Phenotype Ontology (HPO).  Specifically, we used the \texttt{hp.obo} and \url{ALL_SOURCES_ALL_FREQUENCIES_phenotype_to_genes.txt} corresponding to data version \texttt{releases/2018-10-09}.
+
+\subsubsection{HPO-cosine}
+The first phenotype feature is called the ``HPO-cosine'' score.  Given $N$ terms in the HPO, a phenotype profile is represented by an $N$-dimensional vector where dimension $p$ is set to 1.0 if the corresponding phenotype term is present in the profile.  Note that if a phenotype is present in the profile, all ancestor terms as defined by the ontology are automatically set as present as well.  Given two profiles, we calculate the ``HPO-cosine'' score by performing the dot product calculation on the vectors and normalizing by their lengths.  Using this measure, values close to 1.0 are highly similar (the vectors are ``pointing'' in similar directions) whereas those close to 0.0 are not (the vectors are mostly perpendicular).
+
+For each gene, we created a phenotype profile based on the HPO annotations relating genes to phenotypes.  For each patient, we created a phenotype profile and calculated the cosine score between the patient profile and all genes to create an ordered rank from 1 to $G$, where $G$ is the total number of genes annotated by the HPO.  For each variant, we then found the smallest rank, $R$, of genes tied to the variant and stored the normalized value (${R \over G}$) as the ``HPO-cosine'' feature tied to the variant.  For precise implementation details, please refer to the source code (\url{https://github.com/HudsonAlpha/VarSight/blob/master/scripts/HPOUtil.py}).
+
+\subsubsection{PyxisMap}
+The second phenotype is derived from PyxisMap (\url{https://github.com/HudsonAlpha/LayeredGraph}).  We derived our data from PyxisMap v1.2 and we ran the standard installation script that downloads all required data sources on December 19, 2018.
+
+To run PyxisMap, we passed in the patient phenotype terms and obtained an ordered rank of all genes.  For each variant, we then selected the best rank from genes tied to the variant, normalized the rank, and stored it as the ``PyxisMap'' feature tied to the variant.  Note that this process is identical to how ranks were handled in the ``HPO-cosine'' feature.  For precise implementation details, please refer to the source code (\url{https://github.com/HudsonAlpha/VarSight/blob/master/scripts/PyxisMapUtil.py}).
+
+\subsection{Codicem Features}
+Codicem annotates each variant using many different data sources.  We selected the annotations that we believed were most frequently used by analysts when reviewing a case.  Each annotation is assigned a feature type corresponding to how that annotation was turned into a feature for the models:
+
+\begin{enumerate}
+\item float - The feature is a single value floating-point decimal that is copied from the annotation.
+\item single - The annotation is a categorical field with a single value per variant.  Each allowed value is assigned a numerical value, and that value is used as the feature.
+%\item multiple - The annotation is a categorical field with multiple values per variant.  The total number of occurrences of each allowed value is calculated per variant and stored in an array. Then, the collection of variant-occurrence arrays is fed into a Principal Component Analysis.  Each array is then transformed into principal component space, and only the top two component values are added as features to the model.  This is the only feature type resulting in multiple features (i.e. two features) per variant.
+\item multiple - The annotation is a categorical field with multiple values per variant.  The total number of occurrences of each allowed value is calculated per variant and each is stored as a feature.  This is the only annotation type resulting in multiple features per variant.
+\item float\_reduce - The annotation is a floating-point decimal with multiple values per variant.  These float values are combined using a reduction method (typically, minimum or maximum as defined by the JSON configuration) and the single-value result of this reduction is used as the feature.  
+\end{enumerate}
+
+The JSON describing features is available on GitHub (\url{https://github.com/HudsonAlpha/VarSight/blob/master/CODI_metadata/fields_metadata.json}), and a selection of that information is reproduced here.  Table \ref{tab:features} contains a list of each Codicem annotations that was automatically generated from the JSON.
+
+\begin{longtable}{p{.20\linewidth}|p{.20\linewidth}|p{.50\linewidth}}
+\textbf{Feature Label}&\textbf{Feature Type}&\textbf{Description} \\ \hline
+\endhead
+\input{feature_info_rendered.tex}
+\caption{Codicem feature metadata.  This table shows the feature name, feature type, and a brief description of each feature that was fed into the models from Codicem.}
+\label{tab:features}
+\end{longtable}
+
+\section{Hyperparameter Tuning}
+\subsection{Tuning method}
+For each classifier, a selection of hyperparameters were tested based on recommendations from \texttt{sklearn} and \texttt{imblearn}.  We performed a brute-force search over the entire hyperparameter space using the \texttt{GridSearchCV} method of \texttt{sklearn}.  This method tries every combination of hyperparameters and selects the method with the best performance as defined by the user.  For defining performance, we performed stratified 10-fold cross validation (\texttt{StratifiedKFold} in \texttt{sklearn}) on the training data and optimized for best F1-score (see \url{https://scikit-learn.org/stable/modules/generated/sklearn.metrics.f1_score.html} for more info).
+
+\subsection{Tuning results}
+Table \ref{tab:hyperparams} shows the classifiers, hyperparameters, tested values, and the final tuned value for our tests.
+
+\begin{table}
+\begin{tabular}{p{.3\linewidth}|p{.25\linewidth}|p{.2\linewidth}|p{.15\linewidth}}
+\textbf{Classifier}&\textbf{Hyperparameter}&\textbf{Tested Values}&\textbf{Tuned Value} \\ \hline
+\input{hyperparameter_rendered.tex}
+\end{tabular}
+\caption{Hyperparameters tested.  Each classifier is shown on the left.  For each classifier, we selected hyperparameters and test values for those parameters based on recommendations provided by the developers of each method.  The selected tuned value (based on 10-fold cross validation optimizing for F1 score) for each hyperparameter is shown on the right.}
+\label{tab:hyperparams}
+\end{table}
+
+
+\section{External Tools}
+\subsection{Exomiser}
+\subsubsection{Installation}
+We followed the instructions on the Exomiser website (\url{http://exomiser.github.io/Exomiser/manual/7/installation/}) to install Exomiser CLI v.11.0.0.  We downloaded the latest files for hg19 (\url{https://data.monarchinitiative.org/exomiser/latest/1811_hg19.zip}).  Additionally, we downloaded data stores for ReMM v0.3.1 (\url{https://zenodo.org/record/1197579/files/ReMM.v0.3.1.tsv.gz}) and CADD v1.3 (\url{https://krishna.gs.washington.edu/download/CADD/v1.3/whole_genome_SNVs.tsv.gz} and \url{https://krishna.gs.washington.edu/download/CADD/v1.3/InDels.tsv.gz}) for use by Exomiser. 
+
+\subsubsection{Execution}
+Exomiser was run twice using two different final prioritization algorithm: hiPhive and hiPhive (human only).  Here is the templated command we used to run exomiser:
+\begin{verbatim}
+java -Xms2g -Xmx4g -jar exomiser-cli-11.0.0.jar --analysis [ymlFN]
+\end{verbatim}
+
+The \texttt{ymlFN} parameter is a templated file with parameters for the VCF filename, the HPO terms, and the output path.  The template for the hiPhive execution is available at \url{https://github.com/HudsonAlpha/VarSight/blob/master/ExomiserTemplates/hiPhive-template.yml} and the template for the hiPhive (human only) is available at \url{https://github.com/HudsonAlpha/VarSight/blob/master/ExomiserTemplates/hiPhive_human-template.yml}.  These templates were populated with the corresponding information for each patient using the same variants and HPO terms as were used in the VarSight classifiers.
+
+\subsection{Phen-Gen}
+\subsubsection{Installation}
+We followed the instructions on the Phen-Gen website (\url{http://phen-gen.org}, click on ``DOWNLOAD'') to download Phen-GenV1 and followed directions in the README file to install and run Phen-Gen.  
+
+\subsubsection{Execution}
+Phen-Gen takes the HPO terms and VCF file as input to the algorithm.  For the HPO terms, we created a plain-text file with one HPO term per line as instructed.  We used the same pre-filtered VCF file as was used in all other external tools.  
+
+Phen-Gen also requires extra parameters that were not need by other tools, specifically requiring a pedigree file with sex information, mode of inheritance, and the predictor type.  For the pedigree file, we simply created a one-member pedigree with the corresponding sex field populated with the annotated sex of the patient.  For mode of inheritance, we selected dominant as this tended to rank more variants than recessive.  Finally, we selected the predictor type to be ``genomic'' as opposed to ``coding'' only.  Here is the templated command we used to run Phen-Gen:
+
+\begin{verbatim}
+perl phen-gen.pl input_phenotype=[hpoFN] input_vcf=[vcfFN] \
+    input_ped=[pedFN] inheritance=0 predictor=0
+\end{verbatim}
+
+\texttt{hpoFN} is the filename of the HPO file, \texttt{vcfFN} is the filename of the VCF file, and \texttt{pedFN} is the filename of the pedigree file.
+
+\subsection{DeepPVP}
+\subsubsection{Installation}
+We followed the instructions on the GitHub README (\url{https://github.com/bio-ontology-research-group/phenomenet-vp}) to download the distribution file for DeepPVP v2.1.1 (\url{https://github.com/bio-ontology-research-group/phenomenet-vp/releases/download/v2.1.1/phenomenet-vp-2.1.zip}).  We downloaded all datasets required by their instructions including the v2.1 data file (\url{http://bio2vec.net/pvp/data-v2.1.tar.gz}), CADD v1.3 with annotations (\url{http://krishna.gs.washington.edu/download/CADD/v1.3/whole_genome_SNVs_inclAnno.tsv.gz}), and DANN (\url{https://cbcl.ics.uci.edu/public_data/DANN/data/DANN_whole_genome_SNVs.tsv.bgz}).  We then ran their pre-processing of CADD script (\url{http://www.bio2vec.net/pvp/generate.sh}) and moved data to the correct directories.
+
+We created a fresh installation of Python v2.7.16 and followed the instructions to \texttt{pip install -r requirements.txt} to install all required Python packages. However, we found the program was crashing due to incompatibilities between the versions of Keras and Theano.  To fix the issue, we updated to Keras v2.2.4 and the issue was resolved.  Due to the relatively high performance of DeepPVP compared to other external tools, we do not believe this change influenced DeepPVP's performance.
+
+\subsubsection{Execution}
+DeepPVP requires a VCF file and the HPO terms to execute.  Here is the templated command used to run DeepPVP:
+
+\begin{verbatim}
+phenomenet-vp -y [pythonPath] -p [csv-HPO] -f [vcfFN] -of [outFN]
+\end{verbatim}
+
+\texttt{pythonPath} is the path to our fresh Python install, \texttt{csv-HPO} is a comma-separated list of HPO terms for the patient, \texttt{vcfFN} is the filename of the VCF file, and \texttt{outFN} is the filename for storing the output.
+
+\section{Codicem Filtering}
 The following sections describes the filter that was passed to Codicem for generating the test and training set variants.  Figure \ref{fig:filter_overview} shows the sequential order of filters, and the following subsections briefly describes each filter unit's purpose.
 
 \begin{figure}
