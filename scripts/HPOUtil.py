@@ -59,7 +59,9 @@ def loadHPOAnnot(fn, hpoOnt):
     This will load the HPO annotations file
     @param fn - the file to load, expected is ALL_SOURCES_ALL_FREQUENCIES_phenotype_to_genes.txt
     @param hpoOnt - the MicaDS hpoOnt used for filtering out things that are absent
-    @return - dictionary where key is a gene name and value is a set of associated MONDO terms
+    @return - tuple (g2p, p2g)
+        g2p - dictionary where key is a gene symbol and value is a phenotype set
+        p2g - dictionary where key is a HPO ID and value is a gene set
     '''
     g2p = {}
     p2g = {}
