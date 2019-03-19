@@ -1,15 +1,20 @@
 # VarSight Scripts
 This folder contains a wide variety of scripts that were used to gather data, train the classifiers, test the classifiers, and report the results.
 
+## VarSight main
+`VarSight.py` contains the main command-line interface for running VarSight after models have been trained.  Please refer to the main README for more instructions.
+
 ## Data Parsing Scripts
 The following files are primarily used to pre-process data into easy-to-manage formats in Python.
 
 1. CodiDumpUtil.py - This script contains helper functions for parsing a filtered Codicem JSON. It's main purpose is to load a Codicem file and full out the fields requested for use by the classifiers.
-2. ExomiserUtil.py - This script contains helper functions for parsing prioritized variants from Exomiser.  It's main purpose is to search for reported variants in the Exomiser output and return the ranks of those variants if found.  If not found, it conservatively assumes the next best rank is where the variant is found.
+2. ExomiserUtil.py - This script contains helper functions for parsing prioritized variants from Exomiser.
 3. HPOUtil.py - This script contains helper functions for calculating the gene rankings based on the cosine score from the Human Phenotype Ontology (HPO) terms.
 4. OntologyUtil.py - This script contains helper functions for ontologies.  It is primarily support code for HPOUtil.py.
-5. PyxisMapUtil.py - This script contains helper functions for retrieving gene rankings based on the PyxisMap ranks using the HPO terms.
-6. SummaryDBUtil.py - This script contains helper functions for parsing the database dump files containing metadata for the Undiagnosed Diseases Network including samples IDs, HPO terms, and reported primary variants.  Note: these files are not available on GitHub due to Personal Health Information (PHI).
+5. PVPUtil.py - This script contains helper functions for parsing prioritized variants from DeepPVP.
+6. PhenGenUtil.py - This script contains helper function for parsing prioritized variants from Phen-Gen.
+7. PyxisMapUtil.py - This script contains helper functions for retrieving gene rankings based on the PyxisMap ranks using the HPO terms.
+8. SummaryDBUtil.py - This script contains helper functions for parsing the database dump files containing metadata for the Undiagnosed Diseases Network including samples IDs, HPO terms, and reported primary variants.  Note: these files are not available on GitHub due to Personal Health Information (PHI).
 
 ## Training/Testing Scripts
 The following files perform the core workhorse training, testing, and reporting of results from VarSight:
