@@ -1,3 +1,4 @@
+*.hpo
 .DS_Store
 CODI_metadata/3Jan2019_UDN_Variants_all.csv
 CODI_metadata/all.txt
@@ -7,6 +8,7 @@ CODI_metadata/sample_info_dump_v3.csv
 CLI_primary_V6*
 data
 exomiser_results/
+exomiser_results_v2/
 paper/*.sty
 paper/*.png
 paper/*rendered*.tex
@@ -20,6 +22,7 @@ paper/natbib.bst
 paper/OUP_First_SBk_Bot_8401-eps-converted-to.pdf
 paper/OUP_First_SBk_Bot_8401.eps
 paper/plain.bst
+paper/supplements/*rendered*.tex
 paper/supplements/filter_supplement_layer?.dot
 paper/supplements/filter_supplement_layer?.png
 paper/supplements/filter_supplement_overall.dot
@@ -28,6 +31,8 @@ paper/supplements/supplement.aux
 paper/supplements/supplement.log
 paper/supplements/supplement.synctex.gz
 paper/supplements/supplement.toc
+phengen_results/
+pvp_results/
 pyxis_ranks_*
 scripts/__pycache__
 scripts/DownloadCodiResults.py

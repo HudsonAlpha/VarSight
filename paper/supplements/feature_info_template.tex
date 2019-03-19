@@ -1,0 +1,5 @@
+{% for k in KEYS.keys() %}
+    {% for subDict in DATA[k] %}
+        {{ subDict['key'].replace('_', '\\_') }}&{{ subDict['interpret'].replace('_', '\\_') }}&{{ subDict['description'] }} \\ \hline
+    {% endfor %}
+{% endfor %}

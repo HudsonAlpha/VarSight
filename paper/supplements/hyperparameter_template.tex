@@ -1,0 +1,10 @@
+{% for clf_label in CLF_LABELS %}
+    {{ '\\multirow{%d}{*}{\\parbox{1.0\\linewidth}{%s}}' % (len(CLASSIFIERS[clf_label]['BEST_PARAMS']), clf_label.replace('(', ' (')) }} 
+    {% for k in CLASSIFIERS[clf_label]['BEST_PARAMS'] %}
+        &{{ k.replace('_', '\\_') }}&{{ CLASSIFIERS[clf_label]['HYPERPARAMETER_SPACE'][k] }}&{{ CLASSIFIERS[clf_label]['BEST_PARAMS'][k] }} \\ \cline{2-4}
+    {% endfor %}
+    \hline
+{% endfor %}
+
+%resultsDict['CLASSIFIERS'][clf_label]['BEST_PARAMS'] = clf.best_params_
+%resultsDict['CLASSIFIERS'][clf_label]['HYPERPARAMETER_SPACE'] = hyperparam
