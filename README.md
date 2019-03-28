@@ -22,4 +22,4 @@ python3 scripts/VarSight.py -h
 
 ## Publications
 
-Pre-print on bioRxiv: [Holt, James M. et al. "VarSight: Prioritizing Clinically Reported Variants with Binary Classification Algorithms."](https://www.biorxiv.org/content/10.1101/532440v1)
+Pre-print on bioRxiv: [Holt, James M. et al. "VarSight: Prioritizing Clinically Reported Variants with Binary Classification Algorithms."](https://www.biorxiv.org/content/10.1101/532440v2)
