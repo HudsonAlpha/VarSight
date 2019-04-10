@@ -1,21 +1,29 @@
 \multirow{2}{*}{Ranking System}&\multicolumn{4}{c||}{Case Rank - Median (Mean)}&\multicolumn{4}{c}{Percentage in Top X Variants - X=(1, 10, 20)} \\ \cline{2-9}
 &All (n={{ TEST_COUNTS.OVERALL }})&
-VUS (n={{ TEST_COUNTS.VARIANT_OF_UNCERTAIN_SIGNIFICANCE }})&
+VUS (n={{ TEST_COUNTS.get('VARIANT_OF_UNCERTAIN_SIGNIFICANCE', 0) }})&
 LP (n={{ TEST_COUNTS.LIKELY_PATHOGENIC }})&Path. (n={{ TEST_COUNTS.PATHOGENIC }})&
 All (n={{ TEST_COUNTS.OVERALL }})&
-VUS (n={{ TEST_COUNTS.VARIANT_OF_UNCERTAIN_SIGNIFICANCE }})&
+VUS (n={{ TEST_COUNTS.get('VARIANT_OF_UNCERTAIN_SIGNIFICANCE', 0) }})&
 LP (n={{ TEST_COUNTS.LIKELY_PATHOGENIC }})&Path. (n={{ TEST_COUNTS.PATHOGENIC }}) \\ \hhline{=|=|=|=|=||=|=|=|=}
 {% for cs_label in CS_LABELS %}
     {{ cs_label }}&
     {% for LEVEL in LEVELS %}
-        {{ '%0.1f (%0.2f)' % (np.median(COMPARISON[cs_label].TEST_RANKINGS[LEVEL]), np.mean(COMPARISON[cs_label].TEST_RANKINGS[LEVEL])) }}&
+        {% if TEST_COUNTS.get(LEVEL, 0) == 0 %}
+            -- (--)&
+        {% else %}
+            {{ '%0.1f (%0.2f)' % (np.median(COMPARISON[cs_label].TEST_RANKINGS[LEVEL]), np.mean(COMPARISON[cs_label].TEST_RANKINGS[LEVEL])) }}&
+        {% endif %}
     {% endfor %}
     {% for LEVEL in LEVELS %}
-        {{ '%d, %d, %d' % 
-            (100.0*np.sum(np.array(COMPARISON[cs_label].TEST_RANKINGS[LEVEL]) <= 1) / len(COMPARISON[cs_label].TEST_RANKINGS[LEVEL]),
-            100.0*np.sum(np.array(COMPARISON[cs_label].TEST_RANKINGS[LEVEL]) <= 10) / len(COMPARISON[cs_label].TEST_RANKINGS[LEVEL]),
-            100.0*np.sum(np.array(COMPARISON[cs_label].TEST_RANKINGS[LEVEL]) <= 20) / len(COMPARISON[cs_label].TEST_RANKINGS[LEVEL]))
-        }}
+        {% if TEST_COUNTS.get(LEVEL, 0) == 0 %}
+            --
+        {% else %}
+            {{ '%d, %d, %d' % 
+                (100.0*np.sum(np.array(COMPARISON[cs_label].TEST_RANKINGS[LEVEL]) <= 1) / len(COMPARISON[cs_label].TEST_RANKINGS[LEVEL]),
+                100.0*np.sum(np.array(COMPARISON[cs_label].TEST_RANKINGS[LEVEL]) <= 10) / len(COMPARISON[cs_label].TEST_RANKINGS[LEVEL]),
+                100.0*np.sum(np.array(COMPARISON[cs_label].TEST_RANKINGS[LEVEL]) <= 20) / len(COMPARISON[cs_label].TEST_RANKINGS[LEVEL]))
+            }}
+        {% endif %}
         {% if LEVEL != 'PATHOGENIC' %}
             &
         {% endif %}
@@ -27,14 +35,22 @@ LP (n={{ TEST_COUNTS.LIKELY_PATHOGENIC }})&Path. (n={{ TEST_COUNTS.PATHOGENIC }}
 {% for ext_label in EXT_LABELS %}
     {{ ext_label.replace('_', '\\_') }}&
     {% for LEVEL in LEVELS %}
-        {{ '%0.1f (%0.2f)' % (np.median(EXTERNAL[ext_label].TEST_RANKINGS[LEVEL]), np.mean(EXTERNAL[ext_label].TEST_RANKINGS[LEVEL])) }}&
+        {% if TEST_COUNTS.get(LEVEL, 0) == 0 %}
+        -- (--)&
+        {% else %}
+            {{ '%0.1f (%0.2f)' % (np.median(EXTERNAL[ext_label].TEST_RANKINGS[LEVEL]), np.mean(EXTERNAL[ext_label].TEST_RANKINGS[LEVEL])) }}&
+        {% endif %}
     {% endfor %}
     {% for LEVEL in LEVELS %}
-        {{ '%d, %d, %d' % 
-            (100.0*np.sum(np.array(EXTERNAL[ext_label].TEST_RANKINGS[LEVEL]) <= 1) / len(EXTERNAL[ext_label].TEST_RANKINGS[LEVEL]),
-            100.0*np.sum(np.array(EXTERNAL[ext_label].TEST_RANKINGS[LEVEL]) <= 10) / len(EXTERNAL[ext_label].TEST_RANKINGS[LEVEL]),
-            100.0*np.sum(np.array(EXTERNAL[ext_label].TEST_RANKINGS[LEVEL]) <= 20) / len(EXTERNAL[ext_label].TEST_RANKINGS[LEVEL]))
-        }}
+        {% if TEST_COUNTS.get(LEVEL, 0) == 0 %}
+            --
+        {% else %}
+            {{ '%d, %d, %d' % 
+                (100.0*np.sum(np.array(EXTERNAL[ext_label].TEST_RANKINGS[LEVEL]) <= 1) / len(EXTERNAL[ext_label].TEST_RANKINGS[LEVEL]),
+                100.0*np.sum(np.array(EXTERNAL[ext_label].TEST_RANKINGS[LEVEL]) <= 10) / len(EXTERNAL[ext_label].TEST_RANKINGS[LEVEL]),
+                100.0*np.sum(np.array(EXTERNAL[ext_label].TEST_RANKINGS[LEVEL]) <= 20) / len(EXTERNAL[ext_label].TEST_RANKINGS[LEVEL]))
+            }}
+        {% endif %}
         {% if LEVEL != 'PATHOGENIC' %}
             &
         {% endif %}
@@ -46,14 +62,22 @@ LP (n={{ TEST_COUNTS.LIKELY_PATHOGENIC }})&Path. (n={{ TEST_COUNTS.PATHOGENIC }}
 {% for clf_label in CLF_LABELS %}
     {{ clf_label }}&
     {% for LEVEL in LEVELS %}
-        {{ '%0.1f (%0.2f)' % (np.median(CLASSIFIERS[clf_label].TEST_RANKINGS[LEVEL]), np.mean(CLASSIFIERS[clf_label].TEST_RANKINGS[LEVEL])) }}&
+        {% if TEST_COUNTS.get(LEVEL, 0) == 0 %}
+        -- (--)&
+        {% else %}
+            {{ '%0.1f (%0.2f)' % (np.median(CLASSIFIERS[clf_label].TEST_RANKINGS[LEVEL]), np.mean(CLASSIFIERS[clf_label].TEST_RANKINGS[LEVEL])) }}&
+        {% endif %}
     {% endfor %}
     {% for LEVEL in LEVELS %}
-        {{ '%d, %d, %d' % 
-            (100.0*np.sum(np.array(CLASSIFIERS[clf_label].TEST_RANKINGS[LEVEL]) <= 1) / len(CLASSIFIERS[clf_label].TEST_RANKINGS[LEVEL]),
-            100.0*np.sum(np.array(CLASSIFIERS[clf_label].TEST_RANKINGS[LEVEL]) <= 10) / len(CLASSIFIERS[clf_label].TEST_RANKINGS[LEVEL]),
-            100.0*np.sum(np.array(CLASSIFIERS[clf_label].TEST_RANKINGS[LEVEL]) <= 20) / len(CLASSIFIERS[clf_label].TEST_RANKINGS[LEVEL]))
-        }}
+        {% if TEST_COUNTS.get(LEVEL, 0) == 0 %}
+            --
+        {% else %}
+            {{ '%d, %d, %d' % 
+                (100.0*np.sum(np.array(CLASSIFIERS[clf_label].TEST_RANKINGS[LEVEL]) <= 1) / len(CLASSIFIERS[clf_label].TEST_RANKINGS[LEVEL]),
+                100.0*np.sum(np.array(CLASSIFIERS[clf_label].TEST_RANKINGS[LEVEL]) <= 10) / len(CLASSIFIERS[clf_label].TEST_RANKINGS[LEVEL]),
+                100.0*np.sum(np.array(CLASSIFIERS[clf_label].TEST_RANKINGS[LEVEL]) <= 20) / len(CLASSIFIERS[clf_label].TEST_RANKINGS[LEVEL]))
+            }}
+        {% endif %}
         {% if LEVEL != 'PATHOGENIC' %}
             &
         {% endif %}
