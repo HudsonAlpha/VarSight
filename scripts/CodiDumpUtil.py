@@ -212,14 +212,18 @@ def prepDataShared(catMeta, codiDumpFN, pyxisRanks, pyxisLen, hpoRanks, hpoLen):
         vData = []
         catData = []
         
-        #first, add in the best PyxisMap rank
+        #first, add in the best PyxisMap rank and raw score
         geneList = variant['genes']
         pyxisBest = min([pyxisRanks.get(g, (pyxisLen+1, 0.0))[0] / pyxisLen for g in geneList])
         vData.append(pyxisBest)
-        
-        #now, add the best HPOUtil rank
+        #pyxisBest = max([pyxisRanks.get(g, (pyxisLen+1, 0.0))[1] for g in geneList])
+        #vData.append(pyxisBest)
+
+        #now, add the best HPOUtil rank and raw score
         hpoBest = min([hpoRanks.get(g, (hpoLen+1, 0.0))[0] / hpoLen for g in geneList])
         vData.append(hpoBest)
+        #hpoBest = max([hpoRanks.get(g, (hpoLen+1, 0.0))[1] for g in geneList])
+        #vData.append(hpoBest)
         
         #now add all float values from CODICEM
         for fvl, invalidValue in floatValues:
@@ -263,7 +267,17 @@ def prepDataShared(catMeta, codiDumpFN, pyxisRanks, pyxisLen, hpoRanks, hpoLen):
                     arr = [0.0]*indexLen[fieldKey]
                     if fieldKey in ["ClinVar Classification"]:
                         #split on comma or '/'
-                        csvVals = re.split('[,/]', variant[fieldKey].lower())
+                        csvRaw = re.split('[,/]', variant[fieldKey].lower())
+                        csvVals = []
+                        for rawVal in csvRaw:
+                            startParen = rawVal.find('(')
+                            endParen = rawVal.find(')')
+                            if startParen != -1 and endParen != -1:
+                                parsedValue = rawVal[:startParen]
+                                valCount = int(rawVal[startParen+1:endParen])
+                                csvVals += valCount*[parsedValue]
+                            else:
+                                csvVals.append(rawVal)
                     elif fieldKey in ["Ensembl Regulatory Feature"]:
                         #allow missing values here
                         csvVals = variant.get(fieldKey, 'NA').lower().split(';')
@@ -286,7 +300,7 @@ def prepDataShared(catMeta, codiDumpFN, pyxisRanks, pyxisLen, hpoRanks, hpoLen):
                             try:
                                 arr[indexDict[fieldKey][v.strip()]] += 1
                             except:
-                                print(variant[fieldKey], csvVals)
+                                print(fieldKey, variant[fieldKey], csvVals)
                                 raise Exception("Unexpected key, see above")
                     catData += arr
                     catBreak[fieldKey].append(arr)
@@ -303,7 +317,9 @@ def prepDataShared(catMeta, codiDumpFN, pyxisRanks, pyxisLen, hpoRanks, hpoLen):
         #we add all values to our lists for the case
         values.append(vData)
         catValues.append(catData)
-        
+    
+    #if both rank and raw are used
+    #featureLabels = (['PyxisMap', 'PyxisMap-raw', 'HPO-cosine', 'HPO-cosine-raw']+
     featureLabels = (['PyxisMap', 'HPO-cosine']+
         [l for l, d in floatValues]+
         [l for l, r, d in geneValues]+
