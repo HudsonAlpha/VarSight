@@ -1,0 +1,69 @@
+digraph {
+    newrank=true;
+    subgraph cluster_annotation {
+        style=filled;
+		color=lightgrey;
+		node [style=filled,color=lightblue];
+		label="Feature Annotation";
+        fontsize=18;
+        fontname="times-bold";
+
+        filtered_variants [label="Filtered Variants"];
+        hpo [label="HPO terms"];
+        variant_features [label="Variant features"];
+        vcf [label="VCF files"];
+    }
+
+    subgraph cluster_training {
+        style=filled;
+		color=lightgrey;
+		node [style=filled,color=green];
+        label="Training";
+        fontsize=18;
+        fontname="times-bold";
+
+        training_raw [label="Training set\n95 features"];
+        training_reduced [label="Training set\n20 features"];
+        selected_features [label="Top 20 features"];
+        hyperparameters [label="Selected\nHyperparameters"];
+        fitted_models [label="Trained model"];
+    }
+
+    subgraph cluster_testing {
+        style=filled;
+		color=lightgrey;
+		node [style=filled,color=red];
+        label="Testing";
+        fontsize=18;
+        fontname="times-bold";
+
+        testing_raw [label="Testing set\n95 features"];
+        testing_reduced [label="Testing set\n20 features"];
+        final_results [label="Final ranking\nresults"];        
+    }
+
+    {rank=same; training_raw; testing_raw;}
+    {rank=same; training_reduced; testing_reduced;}
+    {rank=same; fitted_models; final_results;}
+
+    #annotation 
+    vcf -> filtered_variants [label="Codicem annotation and filtering"];
+    filtered_variants -> variant_features [label="Reformat annotations\ninto features"];
+    hpo -> variant_features [label="Annotate variants\nwith HPO scores"];
+    variant_features -> training_raw [label="Assign all variants for a proband\nto either train or test set"];
+    
+    #training
+    training_raw -> selected_features [label="Univariate Feature\nSelection (F=20)"];
+    training_raw -> training_reduced;
+    selected_features -> training_reduced [label="Apply Feature\nSelection"];
+    training_reduced -> hyperparameters [label="Hyperparameter\nTuning via\n10-fold Cross\nValidation"];
+    training_reduced -> fitted_models;
+    hyperparameters -> fitted_models [label="Train hypertuned\nmodel"];
+
+    #testing
+    variant_features -> testing_raw;
+    testing_raw -> testing_reduced;
+    selected_features -> testing_reduced;
+    testing_reduced -> final_results [label="Run hypertuned\nmodels on test set"];
+    fitted_models -> final_results;
+}

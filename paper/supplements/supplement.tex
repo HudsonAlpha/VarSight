@@ -1,4 +1,5 @@
 \documentclass{article}
+\usepackage[margin=1in]{geometry}
 \usepackage{graphicx}
 \usepackage{longtable}
 \usepackage{multirow}
@@ -13,6 +14,17 @@
 \maketitle
 
 \tableofcontents
+
+\pagebreak
+\section{Overall Workflow}
+Figure \ref{fig:workflow_outline} contains a visualization of the overall workflow for training VarSight models.  For details, refer to the main paper.
+
+\begin{figure}[!b]
+\centering
+\includegraphics[width=.50\textwidth]{workflow_outline.png}
+\caption{Training Workflow. This is a visualization of the workflow for training VarSight models.}
+\label{fig:workflow_outline}
+\end{figure}
 
 \section{Model Features}
 \subsection{Overview}
@@ -68,7 +80,6 @@ Table \ref{tab:hyperparams} shows the classifiers, hyperparameters, tested value
 \label{tab:hyperparams}
 \end{table}
 
-
 \section{External Tools}
 \subsection{Exomiser}
 \subsubsection{Installation}
@@ -113,6 +124,19 @@ phenomenet-vp -y [pythonPath] -p [csv-HPO] -f [vcfFN] -of [outFN]
 
 \texttt{pythonPath} is the path to our fresh Python install, \texttt{csv-HPO} is a comma-separated list of HPO terms for the patient, \texttt{vcfFN} is the filename of the VCF file, and \texttt{outFN} is the filename for storing the output.
 
+\pagebreak
+\section{Results Extended}
+\subsection{Ranking Boxplot}
+Figure \ref{fig:results_boxplot} shows the rankings from our experimental results in a boxplot format.
+
+\begin{figure}[!b]
+\centering
+\includegraphics[width=.9\textwidth]{results_boxplot.png}
+\caption{Results Boxplot. This image shows the rankings from our experiments in a boxplot format (see Table 3 and 4 in main paper for summarized results). Each reported variant rank is a red circle on the corresponding method with an overlayed, standard boxplot for all rankings for the method. Note, the values in the figure represent only the ranking of reported variants in the test set.}
+\label{fig:results_boxplot}
+\end{figure}
+
+\pagebreak
 \section{Codicem Filtering}
 The following sections describes the filter that was passed to Codicem for generating the test and training set variants.  Figure \ref{fig:filter_overview} shows the sequential order of filters, and the following subsections briefly describes each filter unit's purpose.
 

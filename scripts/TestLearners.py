@@ -24,9 +24,10 @@ from imblearn.ensemble import BalancedRandomForestClassifier, RUSBoostClassifier
 
 from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.feature_selection import SelectKBest
+from sklearn.ensemble import ExtraTreesClassifier
+from sklearn.feature_selection import SelectKBest, SelectFdr, SelectFpr, SelectFwe
+from sklearn.feature_selection import SelectFromModel
 from sklearn.feature_selection import mutual_info_classif
-from sklearn.feature_selection import RFE
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import auc
 from sklearn.metrics import average_precision_score
@@ -43,6 +44,8 @@ from sklearn.model_selection import RandomizedSearchCV
 from sklearn.model_selection import StratifiedKFold
 from sklearn.model_selection import train_test_split
 from sklearn.neural_network import MLPClassifier
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import LinearSVC
 
 #CONSTANTS
 PYXIS_DATE='01042019'   
@@ -453,20 +456,66 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
         (or maybe amount) of pruning.  I think leave it out for now unless this becomes a deal-breaker with some
         ornery reviewer.
         '''
-        #'''
         #more details here: https://scikit-learn.org/stable/modules/feature_selection.html
         #doing this seems to help with LogisticRegression only, but doesn't bring it up to our current results
         #select the best parameters based on training only
-        skb = SelectKBest(k=20)
-        skb.fit(train_x, train_y)
-        selected = skb.get_support(False)
-        selected2 = skb.get_support(True)
-        train_x = train_x[:, selected]
-        test_x = test_x[:, selected]
-        featureLabels = [featureLabels[x] for x in selected2]
-        resultsDict['FEATURE_LABELS'] = featureLabels
-        #'''
+        FS_NONE = 0
+        FS_SELECT_K_BEST = 1
+        #FS_RFECV = 2 #this one took forever to run, and underperformed
+        FS_MODEL_SELECTION = 3
+        FEATURE_SELECTION_TYPE = FS_SELECT_K_BEST
 
+        if FEATURE_SELECTION_TYPE == FS_NONE:
+            pass
+
+        elif FEATURE_SELECTION_TYPE == FS_SELECT_K_BEST:
+            if False:
+                for selectorType in [SelectKBest, SelectFdr, SelectFpr, SelectFwe]:
+                    #skb = SelectKBest(mutual_info_classif, k=20)
+                    skb = selectorType()
+                    skb.fit(train_x, train_y)
+                    #for i, f in enumerate(featureLabels):
+                        #print('', f, -np.log10(skb.pvalues_[i]), sep='\t')
+                    #    print('', f, skb.scores_[i], sep='\t')
+                    selected = skb.get_support(False)
+                    selected2 = skb.get_support(True)
+                    #train_x = train_x[:, selected]
+                    #test_x = test_x[:, selected]
+                    #featureLabels = [featureLabels[x] for x in selected2]
+                    #resultsDict['FEATURE_LABELS'] = featureLabels
+                    print(selectorType)
+                    print('Selected features:', [featureLabels[x] for x in selected2])
+                exit()
+            else:
+                #FWE link: https://stats.stackexchange.com/questions/328358/fpr-fdr-and-fwe-for-feature-selection
+                #skb = SelectFwe()
+                skb = SelectKBest(k=20)
+                skb.fit(train_x, train_y)
+                selected = skb.get_support(False)
+                selected2 = skb.get_support(True)
+                train_x = train_x[:, selected]
+                test_x = test_x[:, selected]
+                featureLabels = [featureLabels[x] for x in selected2]
+                resultsDict['FEATURE_LABELS'] = featureLabels
+                print('Selected features:', featureLabels)
+
+        elif FEATURE_SELECTION_TYPE == FS_MODEL_SELECTION:
+            print('Running SelectFromModel...')
+            lsvc = LinearSVC(C=0.0001, penalty="l1", dual=False, random_state=0, class_weight="balanced", max_iter=5000)
+            standardScaler = StandardScaler()
+            standardScaler.fit(train_x)
+            scaled_x = standardScaler.transform(train_x)
+            lsvc.fit(scaled_x, train_y)
+            sfModel = SelectFromModel(lsvc, prefit=True)
+            #print("Optimal number of features : %d" % rfecv.n_features_)
+            selected = sfModel.get_support(False)
+            selected2 = sfModel.get_support(True)
+            train_x = train_x[:, selected]
+            test_x = test_x[:, selected]
+            print("Train/test size:", train_x.shape, test_x.shape)
+            featureLabels = [featureLabels[x] for x in selected2]
+            resultsDict['FEATURE_LABELS'] = featureLabels
+        
     else:
         #train without any regards to case labels
         train_x, test_x, train_y, test_y = train_test_split(values, classifications, test_size=TEST_SIZE, stratify=classifications)
@@ -508,6 +557,15 @@ def runClassifiers(args, values, classifications, featureLabels, startIndices, a
             'solver' : ['newton-cg', 'liblinear'],
             'max_iter' : [200]
         }),
+        #('ExtraTrees(sklearn)', ExtraTreesClassifier(random_state=0, class_weight='balanced'),
+        #{
+        #    'random_state' : [0],
+        #    'class_weight' : ['balanced'],
+        #    'n_estimators' : [100, 200, 300],
+        #    'max_depth' : [2, 3, 4],
+        #    'min_samples_split' : [2, 3],
+        #    'max_features' : ["sqrt", "log2"]
+        #}),
         ('BalancedRandomForest(imblearn)', BalancedRandomForestClassifier(random_state=0, n_estimators=300, max_depth=4, min_samples_split=2, max_features='sqrt'), 
         {
             'random_state' : [0],
@@ -963,12 +1021,18 @@ def generateLaTeXResult(args, d):
     
     if args.path_only:
         dataFN = rootPath+'/data_rendered_pathOnly.tex'
+        data1FN = rootPath+'/data_rank_rendered_pathOnly.tex'
+        data2FN = rootPath+'/data_top_rendered_pathOnly.tex'
         classifierFN = rootPath+'/classifier_rendered_pathOnly.tex'
         featuresFN = rootPath+'/features_rendered_pathOnly.tex'
+        boxPlotFN = rootPath+'/supplements/results_boxplot_pathOnly.png'
     else:
         dataFN = rootPath+'/data_rendered.tex'
+        data1FN = rootPath+'/data_rank_rendered.tex'
+        data2FN = rootPath+'/data_top_rendered.tex'
         classifierFN = rootPath+'/classifier_rendered.tex'
         featuresFN = rootPath+'/features_rendered.tex'
+        boxPlotFN = rootPath+'/supplements/results_boxplot.png'
 
     #this is independent of args
     featureDescFN = rootPath+'/supplements/feature_info_rendered.tex'
@@ -978,6 +1042,18 @@ def generateLaTeXResult(args, d):
     template = env.get_template('data_template.tex')
     rendered = template.render(d)
     fp = open(dataFN, 'wt+')
+    fp.write(rendered)
+    fp.close()
+
+    #sub-templates for smaller figures
+    template = env.get_template('data_rank_template.tex')
+    rendered = template.render(d)
+    fp = open(data1FN, 'wt+')
+    fp.write(rendered)
+    fp.close()
+    template = env.get_template('data_top_template.tex')
+    rendered = template.render(d)
+    fp = open(data2FN, 'wt+')
     fp.write(rendered)
     fp.close()
 
@@ -1044,6 +1120,58 @@ def generateLaTeXResult(args, d):
     fp.write(rendered)
     fp.close()
 
+    #boxplots of results
+    generateBoxplot(d, boxPlotFN)
+
+    if args.path_only:
+        #do nothing here
+        pass
+    else:
+        #create a combined image
+        #from: https://stackoverflow.com/questions/30227466/combine-several-images-horizontally-with-python
+        from PIL import Image
+        images = [Image.open(fn) for fn in ['/Users/matt/githubProjects/VarSight/paper/codi_rf_roc.png', '/Users/matt/githubProjects/VarSight/paper/codi_rf_pr.png']]
+        widths, heights = zip(*(i.size for i in images))
+        totalWidth = sum(widths)
+        maxHeight = max(heights)
+        new_im = Image.new('RGB', (totalWidth, maxHeight))
+        x_offset = 0
+        for im in images:
+            new_im.paste(im, (x_offset, 0))
+            x_offset += im.size[0]
+        new_im.save('/Users/matt/githubProjects/VarSight/paper/codi_rf_combined.png')
+
+def generateBoxplot(d, boxPlotFN):
+    '''
+    Generates a boxplot summary of the results that we will include in the supplements
+    @param d - the dictionary of results, mostly loaded from JSON
+    @param boxPlotFN - the output filename for the boxplot figure
+    '''
+    plt.figure()
+    labels = []
+    dataPoints = []
+
+    for csLabel in d['CS_LABELS']:
+        labels.append(csLabel)
+        dataPoints.append(d['COMPARISON'][csLabel]['TEST_RANKINGS']['OVERALL'])
+    for extLabel in d['EXT_LABELS']:
+        labels.append(extLabel)
+        dataPoints.append(d['EXTERNAL'][extLabel]['TEST_RANKINGS']['OVERALL'])
+    for clfLabel in d['CLF_LABELS']:
+        labels.append(clfLabel)
+        dataPoints.append(d['CLASSIFIERS'][clfLabel]['TEST_RANKINGS']['OVERALL'])
+
+    for i, dv in enumerate(dataPoints):
+        jitter = np.random.normal(i+1, 0.02, size=len(dv))
+        plt.plot(jitter, dv, 'r.', alpha=0.2)
+    plt.boxplot(dataPoints)
+    
+    plt.xticks(range(1, len(dataPoints)+1), labels, rotation=90)
+    plt.xlabel('Ranking Method')
+    plt.ylabel('Rank (lower is better)')
+    plt.grid()
+    plt.savefig(boxPlotFN, bbox_inches="tight")
+
 def runAnalysis(args):
     '''
     Core function for joining our pieces together
@@ -1077,7 +1205,8 @@ def runAnalysis(args):
         print('PATH_ONLY, not integrated into main paper')
         resultsDict['np'] = np
         resultsDict['len'] = len
-        resultsDict['LEVELS'] = ['OVERALL', 'LIKELY_PATHOGENIC', 'PATHOGENIC']
+        #resultsDict['LEVELS'] = ['OVERALL', 'LIKELY_PATHOGENIC', 'PATHOGENIC']
+        resultsDict['LEVELS'] = ['OVERALL', 'VARIANT_OF_UNCERTAIN_SIGNIFICANCE', 'LIKELY_PATHOGENIC', 'PATHOGENIC']
         generateLaTeXResult(args, resultsDict)
         
     else:
